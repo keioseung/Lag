@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import type { Word, StudyStats } from '@/lib/supabase'
+import { apiClient } from '@/lib/api'
 import { ChevronLeft, ChevronRight, Shuffle, Target, Clock, Volume2 } from 'lucide-react'
 
 interface LearningPanelProps {
@@ -20,6 +21,8 @@ export default function LearningPanel({ words, studyStats, onUpdateStats }: Lear
   const [isFlipped, setIsFlipped] = useState(false)
   const [timer, setTimer] = useState<number | null>(null)
   const [startTime, setStartTime] = useState<number | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [sessionActive, setSessionActive] = useState(false)
 
   const currentWord = words[currentCardIndex]
 
@@ -44,11 +47,41 @@ export default function LearningPanel({ words, studyStats, onUpdateStats }: Lear
     }, 1000)
   }
 
-  const handleModeChange = (mode: StudyMode) => {
+  const startStudySession = async () => {
+    try {
+      const response = await apiClient.startStudySession()
+      if (response.data) {
+        setSessionId(response.data.session_id)
+        setSessionActive(true)
+        setStartTime(Date.now())
+      }
+    } catch (error) {
+      console.error('학습 세션 시작 오류:', error)
+    }
+  }
+
+  const endStudySession = async () => {
+    if (sessionId) {
+      try {
+        await apiClient.endStudySession(sessionId)
+        setSessionId(null)
+        setSessionActive(false)
+        setStartTime(null)
+      } catch (error) {
+        console.error('학습 세션 종료 오류:', error)
+      }
+    }
+  }
+
+  const handleModeChange = async (mode: StudyMode) => {
     setStudyMode(mode)
     setCurrentCardIndex(0)
     setIsFlipped(false)
-    setStartTime(Date.now())
+    
+    // 새로운 모드로 변경할 때 학습 세션 시작
+    if (!sessionActive) {
+      await startStudySession()
+    }
   }
 
   const handleDifficultyChange = (level: Difficulty) => {
@@ -86,8 +119,18 @@ export default function LearningPanel({ words, studyStats, onUpdateStats }: Lear
   }
 
   const updateStudyProgress = async (correct: boolean) => {
-    if (!studyStats) return
+    if (!studyStats || !currentWord) return
 
+    // 백엔드 API를 통해 답변 제출
+    if (sessionId) {
+      try {
+        await apiClient.submitAnswer(sessionId, currentWord.id, correct)
+      } catch (error) {
+        console.error('답변 제출 오류:', error)
+      }
+    }
+
+    // 로컬 통계 업데이트
     const updates = {
       total_answered: studyStats.total_answered + 1,
       correct_answers: studyStats.correct_answers + (correct ? 1 : 0),

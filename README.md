@@ -33,7 +33,9 @@ lingomaster/
 │   ├── AdminPanel.tsx     # 관리자 패널
 │   └── LearningPanel.tsx  # 학습 패널
 ├── lib/                   # 유틸리티
-│   └── supabase.ts        # Supabase 클라이언트
+│   ├── supabase.ts        # Supabase 클라이언트
+│   ├── api.ts             # 백엔드 API 클라이언트
+│   └── api-status.ts      # API 상태 확인 유틸리티
 ├── backend/               # FastAPI 백엔드
 │   ├── main.py           # FastAPI 앱
 │   ├── database.py       # 데이터베이스 설정
@@ -90,10 +92,46 @@ CREATE TABLE study_stats (
 
 ### 2. 환경 변수 설정
 
-1. `env.example`을 `.env.local`로 복사하고 Supabase 정보 입력
+1. `env.example`을 `.env.local`로 복사하고 다음 정보 입력:
+
+```bash
+# Supabase 설정
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+
+# FastAPI 백엔드 URL (Railway 프로덕션)
+NEXT_PUBLIC_API_URL=https://product2-production.up.railway.app
+
+# 백엔드 데이터베이스 설정
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres
+```
+
 2. `backend/.env.example`을 `backend/.env`로 복사하고 데이터베이스 정보 입력
 
-### 3. 프론트엔드 실행
+### 3. 백엔드 연동
+
+프로젝트는 Railway에 배포된 FastAPI 백엔드(`https://product2-production.up.railway.app`)와 연동됩니다.
+
+#### 백엔드 API 엔드포인트
+
+- `GET /words` - 모든 단어 조회
+- `POST /words` - 새 단어 추가
+- `PUT /words/{id}` - 단어 수정
+- `DELETE /words/{id}` - 단어 삭제
+- `GET /study-stats` - 학습 통계 조회
+- `PUT /study-stats` - 학습 통계 업데이트
+- `POST /study-session/start` - 학습 세션 시작
+- `POST /study-session/answer` - 답변 제출
+- `POST /study-session/{session_id}/end` - 학습 세션 종료
+- `GET /health` - API 상태 확인
+
+#### 연동 방식
+
+1. **우선순위**: 백엔드 API → Supabase 직접 연결 → 로컬 데이터
+2. **실시간 상태**: 헤더에 백엔드 연결 상태 표시
+3. **학습 세션**: 백엔드에서 학습 세션 관리 및 통계 추적
+
+### 4. 프론트엔드 실행
 
 ```bash
 # 의존성 설치
