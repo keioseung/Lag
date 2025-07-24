@@ -221,8 +221,14 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
             .order('created_at', { ascending: false })
             .limit(100)
           
-          if (error) throw error
+          if (error) {
+            console.error('Supabase 로그 로드 오류:', error)
+            setUserLogs([])
+            return
+          }
           setUserLogs(data || [])
+        } else {
+          setUserLogs([])
         }
       } else {
         setUserLogs(response.data || [])
@@ -230,6 +236,7 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
     } catch (error) {
       console.error('사용자 로그 로드 오류:', error)
       showNotification('로그를 불러오는 중 오류가 발생했습니다', 'error')
+      setUserLogs([])
     } finally {
       setLogsLoading(false)
     }

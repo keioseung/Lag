@@ -31,7 +31,10 @@ export default function Home() {
     } else {
       setFilteredWords(words)
     }
-    setCurrentWordIndex(0) // 필터 변경 시 첫 번째 단어로 리셋
+    // 필터 변경 시 첫 번째 단어로 리셋 (단어가 있을 때만)
+    if (words.length > 0) {
+      setCurrentWordIndex(0)
+    }
   }, [words, showFavoritesOnly])
 
   // 키보드 단축키 추가
@@ -209,7 +212,7 @@ export default function Home() {
   }
 
   const nextCard = () => {
-    if (isFlipping) return
+    if (isFlipping || filteredWords.length === 0) return
     setIsFlipping(true)
     setShowAnswer(false)
     setCurrentWordIndex((prev) => (prev + 1) % filteredWords.length)
@@ -217,7 +220,7 @@ export default function Home() {
   }
 
   const prevCard = () => {
-    if (isFlipping) return
+    if (isFlipping || filteredWords.length === 0) return
     setIsFlipping(true)
     setShowAnswer(false)
     setCurrentWordIndex((prev) => (prev - 1 + filteredWords.length) % filteredWords.length)
@@ -253,7 +256,7 @@ export default function Home() {
     }
   }
 
-  const currentWord = filteredWords[currentWordIndex]
+  const currentWord = filteredWords.length > 0 ? filteredWords[currentWordIndex] : null
 
   if (loading) {
     return (
@@ -366,19 +369,21 @@ export default function Home() {
             </div>
 
             {/* 플래시카드 */}
-            <FlashcardDisplay
-              word={currentWord}
-              showAnswer={showAnswer}
-              isFlipping={isFlipping}
-              onFlip={flipCard}
-              onToggleFavorite={toggleFavorite}
-            />
+            {currentWord && (
+              <FlashcardDisplay
+                word={currentWord}
+                showAnswer={showAnswer}
+                isFlipping={isFlipping}
+                onFlip={flipCard}
+                onToggleFavorite={toggleFavorite}
+              />
+            )}
 
             {/* 컨트롤 버튼 */}
             <div className="flex justify-center items-center gap-6 mt-12">
               <button
                 onClick={prevCard}
-                disabled={isFlipping}
+                disabled={isFlipping || filteredWords.length === 0}
                 className="group relative px-8 py-4 bg-white/10 backdrop-blur-sm rounded-2xl text-white font-semibold transition-all duration-300 hover:bg-white/20 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
               >
                 <span className="relative z-10 flex items-center">
@@ -392,7 +397,7 @@ export default function Home() {
 
               <button
                 onClick={flipCard}
-                disabled={isFlipping}
+                disabled={isFlipping || filteredWords.length === 0}
                 className="group relative px-12 py-4 bg-gradient-to-r from-purple-500 to-blue-500 rounded-2xl text-white font-semibold transition-all duration-300 hover:from-purple-600 hover:to-blue-600 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
               >
                 <span className="relative z-10 flex items-center">
@@ -406,7 +411,7 @@ export default function Home() {
 
               <button
                 onClick={nextCard}
-                disabled={isFlipping}
+                disabled={isFlipping || filteredWords.length === 0}
                 className="group relative px-8 py-4 bg-white/10 backdrop-blur-sm rounded-2xl text-white font-semibold transition-all duration-300 hover:bg-white/20 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
               >
                 <span className="relative z-10 flex items-center">

@@ -15,6 +15,22 @@ export default function FlashcardDisplay({ word, showAnswer, isFlipping, onFlip,
   const [isHovered, setIsHovered] = useState(false)
   const [isPressed, setIsPressed] = useState(false)
 
+  // word가 없으면 빈 div 반환
+  if (!word) {
+    return (
+      <div className="relative perspective-1000">
+        <div className="relative w-full max-w-2xl mx-auto">
+          <div className="relative bg-gradient-to-br from-white via-gray-50 to-white rounded-3xl p-12 shadow-2xl min-h-[500px] flex flex-col justify-center items-center">
+            <div className="text-center">
+              <div className="text-6xl mb-4">📚</div>
+              <div className="text-xl text-gray-600">단어를 불러오는 중...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const speakWord = (text: string, lang: string = 'zh-CN') => {
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text)
