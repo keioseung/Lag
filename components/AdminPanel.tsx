@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { Word } from '@/lib/supabase'
-import { Plus, Search, Trash2, Download, Upload } from 'lucide-react'
+import { Search, Trash2, Download, Upload } from 'lucide-react'
 import ChineseWordInput from './ChineseWordInput'
 
 interface AdminPanelProps {
@@ -13,37 +13,10 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ words, onAddWord, onDeleteWord, onUpdateWord }: AdminPanelProps) {
-  const [formData, setFormData] = useState({
-    original: '',
-    pronunciation: '',
-    meaning: '',
-    category: '기본'
-  })
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!formData.original || !formData.pronunciation || !formData.meaning) {
-      alert('원언어, 발음, 의미는 필수 입력 항목입니다.')
-      return
-    }
 
-    const result = await onAddWord({
-      ...formData,
-      priority: 0,
-      mastery_level: 0,
-      times_studied: 0,
-      correct_attempts: 0,
-      total_attempts: 0,
-      added_date: new Date().toLocaleDateString()
-    })
-
-    if (result.success) {
-      setFormData({ original: '', pronunciation: '', meaning: '', category: '기본' })
-    }
-  }
 
   const handleDelete = async (id: number) => {
     if (confirm('이 단어를 삭제하시겠습니까?')) {
@@ -110,68 +83,7 @@ export default function AdminPanel({ words, onAddWord, onDeleteWord, onUpdateWor
         </label>
       </div>
 
-      {/* Add Word Form */}
-      <form onSubmit={handleSubmit} className="space-y-4 mb-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              원언어 표기
-            </label>
-            <input
-              type="text"
-              value={formData.original}
-              onChange={(e) => setFormData(prev => ({ ...prev, original: e.target.value }))}
-              placeholder="예: Hello"
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-colors"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              발음 표기
-            </label>
-            <input
-              type="text"
-              value={formData.pronunciation}
-              onChange={(e) => setFormData(prev => ({ ...prev, pronunciation: e.target.value }))}
-              placeholder="예: 헬로우"
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-colors"
-            />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              의미
-            </label>
-            <input
-              type="text"
-              value={formData.meaning}
-              onChange={(e) => setFormData(prev => ({ ...prev, meaning: e.target.value }))}
-              placeholder="예: 안녕하세요"
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-colors"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              카테고리
-            </label>
-            <input
-              type="text"
-              value={formData.category}
-              onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-              placeholder="예: 인사말, 음식, 여행"
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-colors"
-            />
-          </div>
-        </div>
-        <button
-          type="submit"
-          className="btn-primary w-full"
-        >
-          <Plus size={20} className="inline mr-2" />
-          단어 추가
-        </button>
-      </form>
+
 
       {/* Search and Filter */}
       <div className="mb-6">
