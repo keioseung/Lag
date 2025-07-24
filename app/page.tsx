@@ -269,13 +269,15 @@ export default function Home() {
           onClick={() => setCurrentMode('admin')}
           className={`btn-secondary ${currentMode === 'admin' ? 'bg-white/30 border-white/60' : ''}`}
         >
-          관리자 모드
+          <span className="text-lg">📝</span>
+          <span className="ml-2">관리자 모드</span>
         </button>
         <button
           onClick={() => setCurrentMode('learning')}
           className={`btn-secondary ${currentMode === 'learning' ? 'bg-white/30 border-white/60' : ''}`}
         >
-          학습 모드
+          <span className="text-lg">🎓</span>
+          <span className="ml-2">학습 모드</span>
         </button>
       </div>
 

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { Word } from '@/lib/supabase'
 import { Plus, Search, Trash2, Download, Upload } from 'lucide-react'
+import ChineseWordInput from './ChineseWordInput'
 
 interface AdminPanelProps {
   words: Word[]
@@ -85,7 +86,13 @@ export default function AdminPanel({ words, onAddWord, onDeleteWord, onUpdateWor
 
   return (
     <div className="card">
-      <h2 className="text-3xl font-bold text-center mb-8 text-gray-800">단어 관리</h2>
+      <h2 className="text-3xl font-bold text-center mb-8 text-gray-800">
+        <span className="text-2xl mr-2">📚</span>
+        중국어 단어 관리
+      </h2>
+      
+      {/* Chinese Word Input Section */}
+      <ChineseWordInput onAddWord={onAddWord} />
       
       {/* Import/Export Section */}
       <div className="flex gap-4 mb-6">

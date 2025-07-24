@@ -23,10 +23,13 @@ export default function Header() {
 
   return (
     <div className="text-center text-white mb-8">
-      <div className="flex items-center justify-center gap-4 mb-4">
-        <h1 className="text-5xl font-bold text-shadow-lg">
-        LingoMaster
-      </h1>
+            <div className="flex items-center justify-center gap-4 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="text-6xl">🇨🇳</div>
+          <h1 className="text-5xl font-bold text-shadow-lg bg-gradient-to-r from-red-600 to-yellow-500 bg-clip-text text-transparent">
+            중국어 학습기
+          </h1>
+        </div>
         {apiStatus && (
           <div className="flex items-center gap-2 text-sm">
             {apiStatus.isOnline ? (
@@ -41,7 +44,7 @@ export default function Header() {
         )}
       </div>
       <p className="text-xl opacity-90">
-        스마트한 언어 학습의 시작
+        스마트한 중국어 학습 플랫폼
       </p>
     </div>
   )

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import type { Word, StudyStats } from '@/lib/supabase'
 import { apiClient } from '@/lib/api'
 import { ChevronLeft, ChevronRight, Shuffle, Target, Clock, Volume2 } from 'lucide-react'
+import ChineseWordDisplay from './ChineseWordDisplay'
 
 interface LearningPanelProps {
   words: Word[]
@@ -154,8 +155,9 @@ export default function LearningPanel({ words, studyStats, onUpdateStats }: Lear
     return (
       <div className="card">
         <div className="text-center py-12 text-gray-500">
+          <div className="text-4xl mb-4">📚</div>
           <h3 className="text-xl font-semibold mb-2">학습할 단어가 없습니다</h3>
-          <p>관리자 모드에서 단어를 추가해주세요.</p>
+          <p>관리자 모드에서 중국어 단어를 추가해주세요.</p>
         </div>
       </div>
     )
@@ -299,31 +301,13 @@ export default function LearningPanel({ words, studyStats, onUpdateStats }: Lear
         {/* Study Area */}
         <div className="min-h-[400px] flex items-center justify-center">
           {studyMode === 'flashcard' && (
-            <div
-              className={`flashcard ${isFlipped ? 'flipped' : ''}`}
-              onClick={flipCard}
-            >
-              <div className="text-4xl font-bold mb-4">
-                {isFlipped ? currentWord.meaning : currentWord.original}
-              </div>
-              <div className="text-xl opacity-70 mb-4">
-                {isFlipped ? currentWord.category : currentWord.pronunciation}
-              </div>
-              <div className="text-sm opacity-60">
-                {isFlipped ? '클릭해서 앞면 보기' : '클릭해서 뜻 보기'}
-              </div>
-              {!isFlipped && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    speakWord(currentWord.original)
-                  }}
-                  className="mt-4 p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
-                >
-                  <Volume2 size={20} />
-                </button>
-              )}
-            </div>
+            <ChineseWordDisplay
+              word={currentWord}
+              isFlipped={isFlipped}
+              onFlip={flipCard}
+              showPinyin={true}
+              showMeaning={true}
+            />
           )}
 
           {studyMode === 'quiz' && (

@@ -10,20 +10,20 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
+    --primary: 15 100% 50%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96%;
     --secondary-foreground: 222.2 84% 4.9%;
     --muted: 210 40% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
+    --accent: 45 100% 50%;
     --accent-foreground: 222.2 84% 4.9%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --ring: 15 100% 50%;
+    --radius: 0.75rem;
   }
 
   .dark {
@@ -54,29 +54,80 @@
     border-color: hsl(var(--border));
   }
   body {
-    background-color: hsl(var(--background));
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: hsl(var(--foreground));
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-gradient-to-r from-primary-500 to-primary-600 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+    @apply bg-gradient-to-r from-orange-500 to-red-500 text-white px-8 py-4 rounded-2xl font-bold transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 hover:scale-105;
   }
   
   .btn-secondary {
-    @apply bg-white/20 text-white border-2 border-white/30 px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:bg-white/30 hover:border-white/60 hover:-translate-y-1;
+    @apply bg-white/10 text-white border-2 border-white/20 px-8 py-4 rounded-2xl font-semibold transition-all duration-300 hover:bg-white/20 hover:border-white/40 hover:-translate-y-1 hover:scale-105 backdrop-blur-sm;
   }
   
   .card {
-    @apply bg-white/95 rounded-2xl p-8 shadow-xl backdrop-blur-xl border border-white/20;
+    @apply bg-white/90 rounded-3xl p-10 shadow-2xl backdrop-blur-2xl border border-white/30;
   }
   
   .flashcard {
-    @apply bg-white rounded-2xl p-10 text-center shadow-lg min-h-[300px] flex flex-col justify-center cursor-pointer transition-all duration-300 border-2 border-transparent hover:-translate-y-1 hover:shadow-2xl;
+    @apply bg-gradient-to-br from-white to-gray-50 rounded-3xl p-12 text-center shadow-2xl min-h-[400px] flex flex-col justify-center cursor-pointer transition-all duration-500 border border-gray-100 hover:-translate-y-2 hover:shadow-3xl hover:scale-105;
   }
   
   .flashcard.flipped {
-    @apply bg-gradient-to-br from-primary-500 to-primary-600 text-white;
+    @apply bg-gradient-to-br from-orange-500 via-red-500 to-yellow-500 text-white shadow-3xl;
+  }
+
+  /* Chinese character specific styles */
+  .chinese-character {
+    @apply font-serif text-7xl font-black leading-tight;
+    text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.15);
+    background: linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .pinyin-text {
+    @apply font-mono text-3xl text-gray-500 tracking-wider font-medium;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+  }
+
+  .meaning-text {
+    @apply font-sans text-4xl font-bold leading-relaxed;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Category badge styles */
+  .category-badge {
+    @apply px-4 py-2 rounded-2xl text-sm font-bold shadow-lg backdrop-blur-sm;
+  }
+
+  .category-badge.punctuation {
+    @apply bg-gray-100/80 text-gray-800 border border-gray-200/50;
+  }
+
+  .category-badge.person {
+    @apply bg-blue-100/80 text-blue-800 border border-blue-200/50;
+  }
+
+  .category-badge.verb {
+    @apply bg-green-100/80 text-green-800 border border-green-200/50;
+  }
+
+  .category-badge.noun {
+    @apply bg-purple-100/80 text-purple-800 border border-purple-200/50;
+  }
+
+  .category-badge.adjective {
+    @apply bg-orange-100/80 text-orange-800 border border-orange-200/50;
+  }
+
+  .category-badge.default {
+    @apply bg-orange-100/80 text-orange-800 border border-orange-200/50;
   }
 } 
