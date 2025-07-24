@@ -21,6 +21,8 @@ export default function Home() {
   const [showAdminLogin, setShowAdminLogin] = useState(false)
   const [adminPassword, setAdminPassword] = useState('')
   const [adminLoginError, setAdminLoginError] = useState('')
+  const [isAutoPlay, setIsAutoPlay] = useState(false)
+  const [autoPlayInterval, setAutoPlayInterval] = useState<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     loadWords()
@@ -39,6 +41,25 @@ export default function Home() {
       setCurrentWordIndex(0)
     }
   }, [words, showFavoritesOnly])
+
+  // 자동재생 기능
+  useEffect(() => {
+    if (isAutoPlay && filteredWords.length > 0) {
+      const interval = setInterval(() => {
+        nextCard()
+      }, 3000) // 3초마다 다음 카드로
+      setAutoPlayInterval(interval)
+      
+      return () => {
+        if (interval) clearInterval(interval)
+      }
+    } else {
+      if (autoPlayInterval) {
+        clearInterval(autoPlayInterval)
+        setAutoPlayInterval(null)
+      }
+    }
+  }, [isAutoPlay, filteredWords.length])
 
   // 키보드 단축키 추가
   useEffect(() => {
@@ -240,6 +261,10 @@ export default function Home() {
     )
   }
 
+  const toggleAutoPlay = () => {
+    setIsAutoPlay(!isAutoPlay)
+  }
+
   const toggleFavorite = async (wordId: number) => {
     try {
       const word = words.find(w => w.id === wordId)
@@ -374,6 +399,66 @@ export default function Home() {
                 onToggleFavorite={toggleFavorite}
               />
             )}
+
+            {/* 컨트롤 버튼 */}
+            <div className="flex justify-center items-center gap-4 mt-12">
+              <button
+                onClick={prevCard}
+                disabled={isFlipping || filteredWords.length === 0}
+                className="group relative px-8 py-4 bg-white/10 backdrop-blur-sm rounded-2xl text-white font-semibold transition-all duration-300 hover:bg-white/20 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
+              >
+                <span className="relative z-10 flex items-center">
+                  <svg className="w-5 h-5 mr-2 transition-transform group-hover:-translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  이전
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              </button>
+
+              <button
+                onClick={toggleAutoPlay}
+                disabled={filteredWords.length === 0}
+                className={`group relative px-8 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden ${
+                  isAutoPlay 
+                    ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-lg' 
+                    : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg'
+                }`}
+              >
+                <span className="relative z-10 flex items-center">
+                  {isAutoPlay ? (
+                    <>
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      정지
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      자동재생
+                    </>
+                  )}
+                </span>
+                <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"></div>
+              </button>
+
+              <button
+                onClick={nextCard}
+                disabled={isFlipping || filteredWords.length === 0}
+                className="group relative px-8 py-4 bg-white/10 backdrop-blur-sm rounded-2xl text-white font-semibold transition-all duration-300 hover:bg-white/20 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
+              >
+                <span className="relative z-10 flex items-center">
+                  다음
+                  <svg className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              </button>
+            </div>
 
             {/* 학습 통계 */}
             {studyStats && (
