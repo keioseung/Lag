@@ -238,7 +238,9 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
       setBulkInput('')
       setParsedWords([])
       setShowPreview(false)
-      loadWords()
+      console.log('단어 목록 새로고침 중...')
+      await loadWords()
+      console.log('단어 목록 새로고침 완료')
     }
 
     // 결과 알림
