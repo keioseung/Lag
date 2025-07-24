@@ -19,6 +19,9 @@ class ApiClient {
   ): Promise<ApiResponse<T>> {
     try {
       const url = `${this.baseUrl}${endpoint}`
+      console.log('API 요청 URL:', url)
+      console.log('API 요청 옵션:', options)
+      
       const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
@@ -27,11 +30,16 @@ class ApiClient {
         ...options,
       })
 
+      console.log('API 응답 상태:', response.status, response.statusText)
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const errorText = await response.text()
+        console.error('API 응답 에러:', errorText)
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`)
       }
 
       const data = await response.json()
+      console.log('API 응답 데이터:', data)
       return { data }
     } catch (error) {
       console.error('API 요청 오류:', error)

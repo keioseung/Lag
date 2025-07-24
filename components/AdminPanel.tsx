@@ -182,7 +182,6 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
           added_date: new Date().toISOString().split('T')[0],
           difficulty_level: 1,
           is_active: true,
-          is_favorite: false,
           tags: [],
           notes: null
         }
