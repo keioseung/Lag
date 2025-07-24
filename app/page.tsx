@@ -16,11 +16,23 @@ export default function Home() {
   const [showAnswer, setShowAnswer] = useState(false)
   const [isFlipping, setIsFlipping] = useState(false)
   const [isAdminMode, setIsAdminMode] = useState(false)
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
+  const [filteredWords, setFilteredWords] = useState<Word[]>([])
 
   useEffect(() => {
     loadWords()
     loadStudyStats()
   }, [])
+
+  // 필터링된 단어 목록 업데이트
+  useEffect(() => {
+    if (showFavoritesOnly) {
+      setFilteredWords(words.filter(word => word.is_favorite))
+    } else {
+      setFilteredWords(words)
+    }
+    setCurrentWordIndex(0) // 필터 변경 시 첫 번째 단어로 리셋
+  }, [words, showFavoritesOnly])
 
   // 키보드 단축키 추가
   useEffect(() => {
@@ -88,6 +100,7 @@ export default function Home() {
               added_date: '2024-01-01',
               difficulty_level: 1,
               is_active: true,
+              is_favorite: true,
               tags: ['기초', '인사'],
               notes: null,
               created_at: new Date().toISOString(),
@@ -107,6 +120,7 @@ export default function Home() {
               added_date: '2024-01-01',
               difficulty_level: 1,
               is_active: true,
+              is_favorite: false,
               tags: ['기초', '인사'],
               notes: null,
               created_at: new Date().toISOString(),
@@ -126,6 +140,7 @@ export default function Home() {
               added_date: '2024-01-01',
               difficulty_level: 1,
               is_active: true,
+              is_favorite: true,
               tags: ['기초', '인사'],
               notes: null,
               created_at: new Date().toISOString(),
@@ -197,7 +212,7 @@ export default function Home() {
     if (isFlipping) return
     setIsFlipping(true)
     setShowAnswer(false)
-    setCurrentWordIndex((prev) => (prev + 1) % words.length)
+    setCurrentWordIndex((prev) => (prev + 1) % filteredWords.length)
     setTimeout(() => setIsFlipping(false), 300)
   }
 
@@ -205,11 +220,40 @@ export default function Home() {
     if (isFlipping) return
     setIsFlipping(true)
     setShowAnswer(false)
-    setCurrentWordIndex((prev) => (prev - 1 + words.length) % words.length)
+    setCurrentWordIndex((prev) => (prev - 1 + filteredWords.length) % filteredWords.length)
     setTimeout(() => setIsFlipping(false), 300)
   }
 
-  const currentWord = words[currentWordIndex]
+  const toggleFavorite = async (wordId: number) => {
+    try {
+      const wordToUpdate = words.find(w => w.id === wordId)
+      if (!wordToUpdate) return
+
+      const updatedWord = { ...wordToUpdate, is_favorite: !wordToUpdate.is_favorite }
+      
+      // 백엔드 API를 통해 업데이트
+      const response = await apiClient.updateWord(wordId, updatedWord)
+      
+      if (response.error) {
+        console.error('백엔드 API 오류:', response.error)
+        if (supabase) {
+          const { error } = await supabase
+            .from('words')
+            .update({ is_favorite: updatedWord.is_favorite })
+            .eq('id', wordId)
+          
+          if (error) throw error
+        }
+      }
+      
+      // 로컬 상태 업데이트
+      setWords(prev => prev.map(w => w.id === wordId ? updatedWord : w))
+    } catch (error) {
+      console.error('즐겨찾기 토글 오류:', error)
+    }
+  }
+
+  const currentWord = filteredWords[currentWordIndex]
 
   if (loading) {
     return (
@@ -262,18 +306,60 @@ export default function Home() {
               관리자 모드로 이동
             </button>
           </div>
+        ) : filteredWords.length === 0 && showFavoritesOnly ? (
+          <div className="text-center py-20">
+            <div className="animate-bounce mb-8">
+              <div className="text-6xl">⭐</div>
+            </div>
+            <h2 className="text-3xl font-bold text-white mb-4">즐겨찾기한 단어가 없습니다</h2>
+            <p className="text-gray-300 text-lg mb-8">단어를 즐겨찾기하면 여기서만 볼 수 있습니다.</p>
+            <button
+              onClick={() => setShowFavoritesOnly(false)}
+              className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-8 py-4 rounded-2xl font-semibold transition-all duration-300 hover:from-purple-600 hover:to-blue-600 hover:scale-105"
+            >
+              모든 단어 보기
+            </button>
+          </div>
         ) : (
           <div className="max-w-4xl mx-auto">
-            {/* 진행률 표시 */}
-            <div className="mb-8 text-center">
+            {/* 필터 및 진행률 표시 */}
+            <div className="mb-8 flex flex-col items-center space-y-4">
+              {/* 즐겨찾기 필터 */}
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => setShowFavoritesOnly(false)}
+                  className={`px-4 py-2 rounded-full font-semibold transition-all duration-300 ${
+                    !showFavoritesOnly
+                      ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg'
+                      : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                  }`}
+                >
+                  모든 단어
+                </button>
+                <button
+                  onClick={() => setShowFavoritesOnly(true)}
+                  className={`px-4 py-2 rounded-full font-semibold transition-all duration-300 flex items-center ${
+                    showFavoritesOnly
+                      ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-lg'
+                      : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                  }`}
+                >
+                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                  즐겨찾기
+                </button>
+              </div>
+
+              {/* 진행률 표시 */}
               <div className="inline-flex items-center bg-white/10 backdrop-blur-sm rounded-full px-6 py-3 text-white">
                 <span className="text-sm font-medium">
-                  {currentWordIndex + 1} / {words.length}
+                  {currentWordIndex + 1} / {filteredWords.length}
                 </span>
                 <div className="ml-4 w-32 bg-white/20 rounded-full h-2">
                   <div 
                     className="bg-gradient-to-r from-purple-400 to-blue-400 h-2 rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${((currentWordIndex + 1) / words.length) * 100}%` }}
+                    style={{ width: `${filteredWords.length > 0 ? ((currentWordIndex + 1) / filteredWords.length) * 100 : 0}%` }}
                   ></div>
                 </div>
               </div>
@@ -285,6 +371,7 @@ export default function Home() {
               showAnswer={showAnswer}
               isFlipping={isFlipping}
               onFlip={flipCard}
+              onToggleFavorite={toggleFavorite}
             />
 
             {/* 컨트롤 버튼 */}

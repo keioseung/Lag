@@ -23,6 +23,7 @@ export interface Word {
   added_date: string
   difficulty_level: number
   is_active: boolean
+  is_favorite: boolean
   tags: string[]
   notes: string | null
   created_at: string

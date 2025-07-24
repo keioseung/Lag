@@ -28,6 +28,9 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
     total: 0,
     categories: {} as Record<string, number>
   })
+  const [showUserLogs, setShowUserLogs] = useState(false)
+  const [userLogs, setUserLogs] = useState<any[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
 
   useEffect(() => {
     loadWords()
@@ -80,12 +83,24 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
   }
 
   const handleParse = () => {
+    if (!bulkInput.trim()) {
+      showNotification('입력된 텍스트가 없습니다', 'error')
+      return
+    }
+    
     setIsParsing(true)
     setTimeout(() => {
       const parsed = parseChineseInput(bulkInput)
+      console.log('파싱 결과:', parsed) // 디버깅용
       setParsedWords(parsed)
       setShowPreview(true)
       setIsParsing(false)
+      
+      if (parsed.length === 0) {
+        showNotification('파싱할 수 있는 단어가 없습니다. 형식을 확인해주세요.', 'error')
+      } else {
+        showNotification(`${parsed.length}개의 단어가 파싱되었습니다`, 'success')
+      }
     }, 500)
   }
 
@@ -190,6 +205,36 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
     }
   }
 
+  const loadUserLogs = async () => {
+    try {
+      setLogsLoading(true)
+      
+      // 백엔드 API를 통해 사용자 로그 로드
+      const response = await apiClient.getUserLogs()
+      
+      if (response.error) {
+        console.error('백엔드 API 오류:', response.error)
+        if (supabase) {
+          const { data, error } = await supabase
+            .from('user_logs')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(100)
+          
+          if (error) throw error
+          setUserLogs(data || [])
+        }
+      } else {
+        setUserLogs(response.data || [])
+      }
+    } catch (error) {
+      console.error('사용자 로그 로드 오류:', error)
+      showNotification('로그를 불러오는 중 오류가 발생했습니다', 'error')
+    } finally {
+      setLogsLoading(false)
+    }
+  }
+
   useEffect(() => {
     const categories = words.reduce((acc, word) => {
       acc[word.category] = (acc[word.category] || 0) + 1
@@ -257,6 +302,61 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* 일괄 입력 섹션 */}
           <div className="space-y-6">
+            {/* 사용자 로그 섹션 */}
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-white flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  사용자 활동 로그
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowUserLogs(!showUserLogs)
+                    if (!showUserLogs) loadUserLogs()
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl font-semibold transition-all duration-300 hover:from-blue-600 hover:to-purple-600 hover:scale-105"
+                >
+                  {showUserLogs ? '숨기기' : '보기'}
+                </button>
+              </div>
+              
+              {showUserLogs && (
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {logsLoading ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                      <p className="text-gray-300 text-sm">로그를 불러오는 중...</p>
+                    </div>
+                  ) : userLogs.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="text-4xl mb-2">📊</div>
+                      <p className="text-gray-300 text-sm">사용자 활동 로그가 없습니다</p>
+                    </div>
+                  ) : (
+                    userLogs.map((log, index) => (
+                      <div key={index} className="bg-white/5 rounded-lg p-3 border border-white/10">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <span className="text-sm text-gray-300">{log.action || '활동'}</span>
+                            <span className="text-xs text-gray-400">{log.user_id || '익명'}</span>
+                          </div>
+                          <span className="text-xs text-gray-400">
+                            {new Date(log.created_at).toLocaleString()}
+                          </span>
+                        </div>
+                        {log.details && (
+                          <div className="mt-2 text-xs text-gray-300">
+                            {log.details}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
               <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
                 <svg className="w-6 h-6 mr-3 text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">

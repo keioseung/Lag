@@ -115,6 +115,18 @@ class ApiClient {
       body: JSON.stringify(profileData),
     })
   }
+
+  // 사용자 로그 관련 API
+  async getUserLogs() {
+    return this.request<any[]>('/user-logs')
+  }
+
+  async createUserLog(logData: any) {
+    return this.request<any>('/user-logs', {
+      method: 'POST',
+      body: JSON.stringify(logData),
+    })
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL) 
