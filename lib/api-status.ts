@@ -23,7 +23,8 @@ export async function checkApiStatus(): Promise<ApiStatus> {
   
   try {
     // 간단한 헬스체크 엔드포인트 호출
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/health`, {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://product2-production.up.railway.app'
+    const response = await fetch(`${apiUrl}/`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
