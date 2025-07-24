@@ -20,6 +20,48 @@ export default function Home() {
 
   const loadWords = async () => {
     try {
+      // 환경 변수가 설정되지 않은 경우 샘플 데이터 사용
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://your-project.supabase.co') {
+        setWords([
+          {
+            id: 1,
+            original: 'Hello',
+            pronunciation: '헬로우',
+            meaning: '안녕하세요',
+            category: '인사말',
+            priority: 1,
+            mastery_level: 2.0,
+            times_studied: 5,
+            correct_attempts: 4,
+            total_attempts: 5,
+            added_date: '2024-01-01',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          {
+            id: 2,
+            original: 'Thank you',
+            pronunciation: '땡큐',
+            meaning: '감사합니다',
+            category: '인사말',
+            priority: 0,
+            mastery_level: 3.0,
+            times_studied: 8,
+            correct_attempts: 7,
+            total_attempts: 8,
+            added_date: '2024-01-01',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ])
+        setLoading(false)
+        return
+      }
+
+      if (!supabase) {
+        throw new Error('Supabase 클라이언트가 초기화되지 않았습니다.')
+      }
+
       const { data, error } = await supabase
         .from('words')
         .select('*')
@@ -36,6 +78,28 @@ export default function Home() {
 
   const loadStudyStats = async () => {
     try {
+      // 환경 변수가 설정되지 않은 경우 기본 통계 사용
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://your-project.supabase.co') {
+        setStudyStats({
+          id: 1,
+          total_answered: 0,
+          correct_answers: 0,
+          studied_words: [],
+          weak_words: [],
+          daily_streak: 0,
+          daily_goal: 20,
+          daily_progress: 0,
+          words_per_minute: 0.0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        return
+      }
+
+      if (!supabase) {
+        throw new Error('Supabase 클라이언트가 초기화되지 않았습니다.')
+      }
+
       const { data, error } = await supabase
         .from('study_stats')
         .select('*')
@@ -49,6 +113,11 @@ export default function Home() {
   }
 
   const addWord = async (wordData: Omit<Word, 'id' | 'created_at' | 'updated_at'>) => {
+    if (!supabase) {
+      console.warn('Supabase 클라이언트가 초기화되지 않았습니다.')
+      return { success: false, error: 'Supabase not initialized' }
+    }
+
     try {
       const { data, error } = await supabase
         .from('words')
@@ -66,6 +135,11 @@ export default function Home() {
   }
 
   const deleteWord = async (id: number) => {
+    if (!supabase) {
+      console.warn('Supabase 클라이언트가 초기화되지 않았습니다.')
+      return { success: false, error: 'Supabase not initialized' }
+    }
+
     try {
       const { error } = await supabase
         .from('words')
@@ -82,6 +156,11 @@ export default function Home() {
   }
 
   const updateWord = async (id: number, updates: Partial<Word>) => {
+    if (!supabase) {
+      console.warn('Supabase 클라이언트가 초기화되지 않았습니다.')
+      return { success: false, error: 'Supabase not initialized' }
+    }
+
     try {
       const { data, error } = await supabase
         .from('words')
@@ -100,6 +179,11 @@ export default function Home() {
   }
 
   const updateStudyStats = async (updates: Partial<StudyStats>) => {
+    if (!supabase) {
+      console.warn('Supabase 클라이언트가 초기화되지 않았습니다.')
+      return { success: false, error: 'Supabase not initialized' }
+    }
+
     try {
       if (studyStats) {
         const { data, error } = await supabase
