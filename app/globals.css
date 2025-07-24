@@ -75,11 +75,11 @@
   }
   
   .flashcard {
-    @apply bg-gradient-to-br from-white to-gray-50 rounded-3xl p-12 text-center shadow-2xl min-h-[400px] flex flex-col justify-center cursor-pointer transition-all duration-500 border border-gray-100 hover:-translate-y-2 hover:shadow-3xl hover:scale-105;
+    @apply bg-gradient-to-br from-white to-gray-50 rounded-3xl p-12 text-center shadow-2xl min-h-[400px] flex flex-col justify-center cursor-pointer transition-all duration-500 border border-gray-100 hover:-translate-y-2 hover:shadow-2xl hover:scale-105;
   }
   
   .flashcard.flipped {
-    @apply bg-gradient-to-br from-orange-500 via-red-500 to-yellow-500 text-white shadow-3xl;
+    @apply bg-gradient-to-br from-orange-500 via-red-500 to-yellow-500 text-white shadow-2xl;
   }
 
   /* Chinese character specific styles */
