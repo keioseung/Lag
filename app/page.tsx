@@ -129,15 +129,15 @@ export default function Home() {
         console.error('백엔드 API 오류:', response.error)
         // 백엔드 API 실패 시 Supabase 직접 사용 시도
         if (supabase) {
-      const { data, error } = await supabase
-        .from('words')
-        .insert([wordData])
-        .select()
-        .single()
+          const { data, error } = await supabase
+            .from('words')
+            .insert([wordData])
+            .select()
+            .single()
 
-      if (error) throw error
-      setWords(prev => [data, ...prev])
-      return { success: true }
+          if (error) throw error
+          setWords(prev => [data, ...prev])
+          return { success: true }
         }
         return { success: false, error: response.error }
       } else {

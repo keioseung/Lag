@@ -90,7 +90,7 @@ export default function ChineseWordInput({ onAddWord }: ChineseWordInputProps) {
         times_studied: 0,
         correct_attempts: 0,
         total_attempts: 0,
-        added_date: new Date(),
+        added_date: new Date().toISOString().split('T')[0],
         difficulty_level: 1,
         is_active: true,
         tags: [],

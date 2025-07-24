@@ -20,7 +20,7 @@ export interface Word {
   times_studied: number
   correct_attempts: number
   total_attempts: number
-  added_date: Date
+  added_date: string
   difficulty_level: number
   is_active: boolean
   tags: string[]
