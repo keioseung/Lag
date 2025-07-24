@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api'
 import type { Word, StudyStats } from '@/lib/supabase'
 import Header from '@/components/Header'
 import FlashcardDisplay from '@/components/FlashcardDisplay'
+import AdminPanel from '@/components/AdminPanel'
 
 export default function Home() {
   const [words, setWords] = useState<Word[]>([])
@@ -14,6 +15,7 @@ export default function Home() {
   const [currentWordIndex, setCurrentWordIndex] = useState(0)
   const [showAnswer, setShowAnswer] = useState(false)
   const [isFlipping, setIsFlipping] = useState(false)
+  const [isAdminMode, setIsAdminMode] = useState(false)
 
   useEffect(() => {
     loadWords()
@@ -39,12 +41,19 @@ export default function Home() {
           event.preventDefault()
           nextCard()
           break
+        case 'a':
+        case 'A':
+          if (event.ctrlKey || event.metaKey) {
+            event.preventDefault()
+            setIsAdminMode(!isAdminMode)
+          }
+          break
       }
     }
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [isFlipping])
+  }, [isFlipping, isAdminMode])
 
   const loadWords = async () => {
     try {
@@ -213,9 +222,30 @@ export default function Home() {
     )
   }
 
+  // 관리자 모드일 때 관리자 패널 표시
+  if (isAdminMode) {
+    return <AdminPanel onBackToLearning={() => setIsAdminMode(false)} />
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       <Header />
+      
+      {/* 관리자 모드 토글 버튼 */}
+      <div className="absolute top-4 right-4 z-10">
+        <button
+          onClick={() => setIsAdminMode(true)}
+          className="group relative bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 text-white font-semibold transition-all duration-300 hover:bg-white/20 hover:scale-105 border border-white/20"
+        >
+          <span className="flex items-center">
+            <svg className="w-5 h-5 mr-2 transition-transform group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+            관리자
+          </span>
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"></div>
+        </button>
+      </div>
       
       <main className="container mx-auto px-4 py-8">
         {words.length === 0 ? (
@@ -224,7 +254,13 @@ export default function Home() {
               <div className="text-6xl">📚</div>
             </div>
             <h2 className="text-3xl font-bold text-white mb-4">학습할 단어가 없습니다</h2>
-            <p className="text-gray-300 text-lg">관리자가 단어를 추가하면 여기서 학습할 수 있습니다.</p>
+            <p className="text-gray-300 text-lg mb-8">관리자가 단어를 추가하면 여기서 학습할 수 있습니다.</p>
+            <button
+              onClick={() => setIsAdminMode(true)}
+              className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-8 py-4 rounded-2xl font-semibold transition-all duration-300 hover:from-purple-600 hover:to-blue-600 hover:scale-105"
+            >
+              관리자 모드로 이동
+            </button>
           </div>
         ) : (
           <div className="max-w-4xl mx-auto">
