@@ -13,7 +13,7 @@ class WordBase(BaseModel):
     times_studied: int = 0
     correct_attempts: int = 0
     total_attempts: int = 0
-    added_date: str
+    added_date: date
     difficulty_level: int = 1
     is_active: bool = True
     tags: List[str] = []
@@ -32,6 +32,7 @@ class WordUpdate(BaseModel):
     times_studied: Optional[int] = None
     correct_attempts: Optional[int] = None
     total_attempts: Optional[int] = None
+    added_date: Optional[date] = None
     difficulty_level: Optional[int] = None
     is_active: Optional[bool] = None
     tags: Optional[List[str]] = None

@@ -20,13 +20,13 @@ export interface Word {
   times_studied: number
   correct_attempts: number
   total_attempts: number
-  added_date: string
+  added_date: Date
   difficulty_level: number
   is_active: boolean
   tags: string[]
   notes: string | null
   created_at: string
-  updated_at: string
+  updated_at: string | null
 }
 
 export interface StudyStats {
