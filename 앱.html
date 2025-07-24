@@ -1,0 +1,2084 @@
+ Data storage
+        let words = [];
+        let currentMode = 'admin';
+        let studyMode = 'flashcard';
+        let currentCardIndex = 0;
+        let isFlipped = false;
+        let difficulty = 'normal';
+        let currentFilter = 'all';
+        let timerInterval = null;
+        let startTime = null;
+        let studyStats = {
+            totalAnswered 0,
+            correctAnswers 0,
+            studiedWords new Set(),
+            weakWords new Set(),
+            dailyStreak 0,
+            dailyGoal 20,
+            dailyProgress 0,
+            wordsPerMinute 0
+        };
+
+         Initialize app
+        function init() {
+            loadWords();
+            updateWordList();
+            updateStats();
+            updateCategoryTags();
+            checkDailyStreak();
+        }
+
+         Advanced word management
+        function addWord() {
+            const original = document.getElementById('originalWord').value.trim();
+            const pronunciation = document.getElementById('pronunciation').value.trim();
+            const meaning = document.getElementById('meaning').value.trim();
+            const category = document.getElementById('category').value.trim()  '기본';
+
+            if (!original  !pronunciation  !meaning) {
+                alert('원언어, 발음, 의미는 필수 입력 항목입니다.');
+                return;
+            }
+
+            const word = {
+                id Date.now(),
+                original,
+                pronunciation,
+                meaning,
+                category,
+                addedDate new Date().toLocaleDateString(),
+                priority 0,
+                masteryLevel 0,
+                timesStudied 0,
+                correctAttempts 0,
+                totalAttempts 0
+            };
+
+            words.push(word);
+            saveWords();
+            updateWordList();
+            updateCategoryTags();
+            clearForm();
+            
+             Show success feedback
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '추가됨!';
+            btn.style.background = '#4caf50';
+            setTimeout(() = {
+                btn.textContent = originalText;
+                btn.style.background = '';
+            }, 1500);
+        }
+
+        function clearForm() {
+            document.getElementById('originalWord').value = '';
+            document.getElementById('pronunciation').value = '';
+            document.getElementById('meaning').value = '';
+            document.getElementById('category').value = '';
+        }
+
+        function searchWords() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filteredWords = words.filter(word = 
+                word.original.toLowerCase().includes(searchTerm) 
+                word.pronunciation.toLowerCase().includes(searchTerm) 
+                word.meaning.toLowerCase().includes(searchTerm) 
+                word.category.toLowerCase().includes(searchTerm)
+            );
+            displayWordList(filteredWords);
+        }
+
+        function filterByCategory(category) {
+            currentFilter = category;
+            document.querySelectorAll('.category-tag').forEach(tag = tag.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            const filteredWords = category === 'all'  words  words.filter(word = word.category === category);
+            displayWordList(filteredWords);
+        }
+
+        function updateCategoryTags() {
+            const categories = [...new Set(words.map(word = word.category))];
+            const categoryTags = document.getElementById('categoryTags');
+            
+            categoryTags.innerHTML = `
+                div class=category-tag active onclick=filterByCategory('all')전체div
+                ${categories.map(cat = `
+                    div class=category-tag onclick=filterByCategory('${cat}')${cat}div
+                `).join('')}
+            `;
+        }
+
+        function updateWordList() {
+            displayWordList(words);
+        }
+
+        function displayWordList(wordsToShow) {
+            const wordList = document.getElementById('wordList');
+            
+            if (wordsToShow.length === 0) {
+                wordList.innerHTML = `
+                    div class=empty-state
+                        h3표시할 단어가 없습니다h3
+                        p검색어를 확인하거나 새 단어를 추가해보세요.p
+                    div
+                `;
+                return;
+            }
+
+            wordList.innerHTML = wordsToShow.map(word = `
+                div class=word-item
+                    div class=word-details
+                        div class=original-word${word.original}div
+                        div class=pronunciation${word.pronunciation}div
+                        div class=meaning${word.meaning}div
+                        div style=display flex; justify-content space-between; align-items center; margin-top 10px;
+                            span class=category-tag style=margin 0;${word.category}span
+                            div class=mastery-indicator
+                                ${Array.from({length 5}, (_, i) = 
+                                    `div class=mastery-dot ${i  word.masteryLevel  'filled'  ''}div`
+                                ).join('')}
+                            div
+                        div
+                        div class=word-priority
+                            ${Array.from({length 5}, (_, i) = 
+                                `span class=priority-star ${i  word.priority  ''  'opacity 0.3;'} onclick=setPriority(${word.id}, ${i + 1})⭐span`
+                            ).join('')}
+                        div
+                    div
+                    button class=delete-btn onclick=deleteWord(${word.id})삭제button
+                div
+            `).join('');
+        }
+
+        function setPriority(wordId, priority) {
+            const word = words.find(w = w.id === wordId);
+            if (word) {
+                word.priority = priority;
+                saveWords();
+                updateWordList();
+            }
+        }
+
+         CSV ImportExport
+        function exportCSV() {
+            const csvContent = [
+                ['원언어', '발음', '의미', '카테고리', '우선순위', '숙련도'],
+                ...words.map(word = [
+                    word.original,
+                    word.pronunciation,
+                    word.meaning,
+                    word.category,
+                    word.priority,
+                    word.masteryLevel
+                ])
+            ].map(row = row.join(',')).join('n');
+
+            const blob = new Blob([csvContent], { type 'textcsv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `언어학습_단어장_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+
+        function importCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const csv = e.target.result;
+                const lines = csv.split('n');
+                const headers = lines[0].split(',');
+                
+                let importedCount = 0;
+                for (let i = 1; i  lines.length; i++) {
+                    const data = lines[i].split(',');
+                    if (data.length = 3 && data[0] && data[1] && data[2]) {
+                        const word = {
+                            id Date.now() + i,
+                            original data[0].trim(),
+                            pronunciation data[1].trim(),
+                            meaning data[2].trim(),
+                            category data[3]  data[3].trim()  '기본',
+                            priority data[4]  parseInt(data[4])  0,
+                            masteryLevel data[5]  parseInt(data[5])  0,
+                            addedDate new Date().toLocaleDateString(),
+                            timesStudied 0,
+                            correctAttempts 0,
+                            totalAttempts 0
+                        };
+                        words.push(word);
+                        importedCount++;
+                    }
+                }
+                
+                saveWords();
+                updateWordList();
+                updateCategoryTags();
+                alert(`${importedCount}개의 단어를 가져왔습니다.`);
+            };
+            reader.readAsText(file);
+        }
+
+        function clearAllWords() {
+            if (confirm('모든 단어를 삭제하시겠습니까 이 작업은 되돌릴 수 없습니다.')) {
+                words = [];
+                saveWords();
+                updateWordList();
+                updateCategoryTags();
+                updateStats();
+            }
+        }
+
+         Advanced study modes
+        function setDifficulty(level) {
+            difficulty = level;
+            document.querySelectorAll('.difficulty-btn').forEach(btn = btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+             Adjust quiz options based on difficulty
+            displayStudyContent();
+        }
+
+        function studyWeakWords() {
+            const weakWords = words.filter(word = 
+                word.totalAttempts  0 && 
+                (word.correctAttempts  word.totalAttempts)  0.7
+            );
+            
+            if (weakWords.length === 0) {
+                alert('약점 단어가 없습니다! 계속 학습해보세요.');
+                return;
+            }
+            
+            words = weakWords;
+            currentCardIndex = 0;
+            displayStudyContent();
+        }
+
+        function markDifficult() {
+            const currentWord = words[currentCardIndex];
+            studyStats.weakWords.add(currentWord.id);
+            currentWord.priority = Math.min(5, (currentWord.priority  0) + 1);
+            
+             Visual feedback
+            const btn = document.getElementById('difficultButton');
+            const originalText = btn.textContent;
+            btn.textContent = '표시됨!';
+            btn.style.background = '#ff6b6b';
+            setTimeout(() = {
+                btn.textContent = originalText;
+                btn.style.background = '';
+            }, 1000);
+            
+            saveWords();
+        }
+
+         Enhanced display functions
+        function displayListening() {
+            const word = words[currentCardIndex];
+            const studyArea = document.getElementById('studyArea');
+            
+            studyArea.innerHTML = `
+                div class=flashcard
+                    div class=card-content${word.meaning}div
+                    div class=card-subtitle듣고 맞는 단어를 선택하세요div
+                    div class=voice-controls
+                        button class=voice-btn onclick=speakWord('${word.original}')🔊button
+                        button class=voice-btn onclick=speakWord('${word.pronunciation}')🎵button
+                    div
+                    div class=quiz-options
+                        ${generateListeningOptions(word).map(option = `
+                            div class=quiz-option onclick=selectListeningOption(this, '${option}', '${word.original}')
+                                ${option}
+                            div
+                        `).join('')}
+                    div
+                div
+            `;
+        }
+
+        function generateListeningOptions(correctWord) {
+            const wrongOptions = words
+                .filter(w = w.id !== correctWord.id)
+                .sort(() = Math.random() - 0.5)
+                .slice(0, 3)
+                .map(w = w.original);
+            
+            return [correctWord.original, ...wrongOptions].sort(() = Math.random() - 0.5);
+        }
+
+        function speakWord(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.8;
+                speechSynthesis.speak(utterance);
+            }
+        }
+
+        function selectListeningOption(element, selected, correct) {
+             Same logic as quiz selection
+            selectQuizOption(element, selected, correct);
+        }
+
+         Timer functions
+        function startTimer(seconds = 30) {
+            clearInterval(timerInterval);
+            document.getElementById('timerDisplay').style.display = 'block';
+            document.getElementById('timerValue').textContent = seconds;
+            
+            timerInterval = setInterval(() = {
+                seconds--;
+                document.getElementById('timerValue').textContent = seconds;
+                
+                if (seconds = 0) {
+                    clearInterval(timerInterval);
+                    document.getElementById('timerDisplay').style.display = 'none';
+                     Auto advance or show timeout
+                    if (studyMode === 'quiz'  studyMode === 'typing') {
+                        alert('시간 초과! 다음 단어로 넘어갑니다.');
+                        nextCard();
+                    }
+                }
+            }, 1000);
+        }
+
+         Enhanced stats
+        function updateStats() {
+            document.getElementById('totalWords').textContent = words.length;
+            document.getElementById('studiedWords').textContent = studyStats.studiedWords.size;
+            
+            const accuracy = studyStats.totalAnswered  0 
+                 Math.round((studyStats.correctAnswers  studyStats.totalAnswered)  100)
+                 0;
+            document.getElementById('accuracy').textContent = accuracy + '%';
+            
+             Calculate WPM
+            const wpm = calculateWPM();
+            document.getElementById('wpm').textContent = wpm;
+            
+             Update daily progress
+            updateDailyProgress();
+        }
+
+        function calculateWPM() {
+            if (!startTime  studyStats.studiedWords.size === 0) return 0;
+            
+            const timeElapsed = (Date.now() - startTime)  60000;  minutes
+            return Math.round(studyStats.studiedWords.size  timeElapsed)  0;
+        }
+
+        function updateDailyProgress() {
+            const progress = Math.min(studyStats.dailyProgress, studyStats.dailyGoal);
+            const percentage = (progress  studyStats.dailyGoal)  100;
+            
+            document.getElementById('dailyProgress').textContent = progress;
+            document.getElementById('dailyProgressFill').style.width = percentage + '%';
+            
+            if (progress = studyStats.dailyGoal) {
+                document.getElementById('dailyProgress').parentElement.innerHTML += 
+                    'span class=achievement-badge목표 달성! 🎉span';
+            }
+        }
+
+        function checkDailyStreak() {
+            const today = new Date().toDateString();
+            const lastStudyDate = localStorage.getItem('lastStudyDate');
+            
+            if (lastStudyDate === today) {
+                 Already studied today
+                document.getElementById('streakCounter').style.display = 'block';
+                document.getElementById('streakNumber').textContent = studyStats.dailyStreak;
+            } else {
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                
+                if (lastStudyDate === yesterday.toDateString()) {
+                     Continue streak
+                    studyStats.dailyStreak++;
+                } else if (lastStudyDate !== today) {
+                     Reset streak
+                    studyStats.dailyStreak = 1;
+                }
+                
+                localStorage.setItem('lastStudyDate', today);
+                document.getElementById('streakCounter').style.display = 'block';
+                document.getElementById('streakNumber').textContent = studyStats.dailyStreak;
+            }
+        }
+
+         Enhanced study mode switching
+        function setStudyMode(mode) {
+            studyMode = mode;
+            document.querySelectorAll('.control-btn').forEach(btn = btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            currentCardIndex = 0;
+            isFlipped = false;
+            startTime = Date.now();
+            
+             Start timer for timed modes
+            if (mode === 'quiz' && difficulty === 'hard') {
+                startTimer(15);
+            } else if (mode === 'typing' && difficulty !== 'easy') {
+                startTimer(30);
+            }
+            
+            displayStudyContent();
+        }
+
+        function displayStudyContent() {
+            const studyArea = document.getElementById('studyArea');
+            const navButtons = document.getElementById('navButtons');
+            
+            if (words.length === 0) {
+                studyArea.innerHTML = `
+                    div class=empty-state
+                        h3학습할 단어가 없습니다h3
+                        p관리자 모드에서 단어를 추가해주세요.p
+                    div
+                `;
+                navButtons.style.display = 'none';
+                return;
+            }
+
+            navButtons.style.display = 'flex';
+            updateNavigationButtons();
+            updateProgress();
+
+            switch (studyMode) {
+                case 'flashcard'
+                    displayFlashcard();
+                    break;
+                case 'quiz'
+                    displayQuiz();
+                    break;
+                case 'typing'
+                    displayTyping();
+                    break;
+                case 'listening'
+                    displayListening();
+                    break;
+            }
+        }
+
+        function displayFlashcard() {
+            const word = words[currentCardIndex];
+            const studyArea = document.getElementById('studyArea');
+            
+            studyArea.innerHTML = `
+                div class=flashcard ${isFlipped  'flipped'  ''} onclick=flipCard()
+                    div class=card-content
+                        ${isFlipped  word.meaning  word.original}
+                    div
+                    div class=card-subtitle
+                        ${isFlipped  word.category  word.pronunciation}
+                    div
+                    div class=mastery-indicator
+                        ${Array.from({length 5}, (_, i) = 
+                            `div class=mastery-dot ${i  word.masteryLevel  'filled'  ''}div`
+                        ).join('')}
+                    div
+                    div class=card-hint
+                        ${isFlipped  '클릭해서 앞면 보기'  '클릭해서 뜻 보기'}
+                    div
+                    ${word.priority  2  'div class=achievement-badge어려운 단어div'  ''}
+                div
+            `;
+        }
+
+        function displayQuiz() {
+            const word = words[currentCardIndex];
+            const studyArea = document.getElementById('studyArea');
+            
+             Generate options based on difficulty
+            let wrongOptionsCount = difficulty === 'easy'  2  difficulty === 'normal'  3  4;
+            const wrongOptions = words
+                .filter(w = w.id !== word.id)
+                .sort(() = Math.random() - 0.5)
+                .slice(0, wrongOptionsCount)
+                .map(w = w.meaning);
+            
+            const allOptions = [word.meaning, ...wrongOptions].sort(() = Math.random() - 0.5);
+            
+            studyArea.innerHTML = `
+                div class=flashcard
+                    div class=card-content${word.original}div
+                    div class=card-subtitle${word.pronunciation}div
+                    div class=mastery-indicator
+                        ${Array.from({length 5}, (_, i) = 
+                            `div class=mastery-dot ${i  word.masteryLevel  'filled'  ''}div`
+                        ).join('')}
+                    div
+                    div class=quiz-options style=grid-template-columns ${wrongOptionsCount = 2  '1fr 1fr'  wrongOptionsCount === 3  'repeat(2, 1fr)'  'repeat(2, 1fr)'};
+                        ${allOptions.map(option = `
+                            div class=quiz-option onclick=selectQuizOption(this, '${option}', '${word.meaning}')
+                                ${option}
+                            div
+                        `).join('')}
+                    div
+                div
+            `;
+        }
+
+        function displayTyping() {
+            const word = words[currentCardIndex];
+            const studyArea = document.getElementById('studyArea');
+            
+            const showHint = difficulty === 'easy';
+            const hintText = showHint  `힌트 ${word.original.charAt(0)}${'_'.repeat(word.original.length - 1)}`  '';
+            
+            studyArea.innerHTML = `
+                div class=flashcard
+                    div class=card-content${word.meaning}div
+                    div class=card-subtitle
+                        ${word.pronunciation}
+                        ${showHint  `brsmall style=color #999;${hintText}small`  ''}
+                    div
+                    div class=mastery-indicator
+                        ${Array.from({length 5}, (_, i) = 
+                            `div class=mastery-dot ${i  word.masteryLevel  'filled'  ''}div`
+                        ).join('')}
+                    div
+                    div style=margin 20px 0;
+                        input type=text id=typingInput placeholder=여기에 입력하세요 
+                               style=width 100%; padding 15px; font-size 1.2rem; border 2px solid #e1e5e9; border-radius 12px; text-align center;
+                               onkeypress=checkTyping(event, '${word.original}')
+                               autocomplete=off spellcheck=false
+                    div
+                    div id=typingFeedbackdiv
+                div
+            `;
+            
+            document.getElementById('typingInput').focus();
+        }
+
+        function displayListening() {
+            const word = words[currentCardIndex];
+            const studyArea = document.getElementById('studyArea');
+            
+            studyArea.innerHTML = `
+                div class=flashcard
+                    div class=card-content${word.meaning}div
+                    div class=card-subtitle듣고 맞는 단어를 선택하세요div
+                    div class=voice-controls
+                        button class=voice-btn onclick=speakWord('${word.original}') title=원어 발음🔊button
+                        button class=voice-btn onclick=speakWord('${word.pronunciation}') title=한국어 발음🎵button
+                        button class=voice-btn onclick=speakSlowly('${word.original}') title=천천히🐌button
+                    div
+                    div class=mastery-indicator
+                        ${Array.from({length 5}, (_, i) = 
+                            `div class=mastery-dot ${i  word.masteryLevel  'filled'  ''}div`
+                        ).join('')}
+                    div
+                    div class=quiz-options
+                        ${generateListeningOptions(word).map(option = `
+                            div class=quiz-option onclick=selectListeningOption(this, '${option}', '${word.original}')
+                                ${option}
+                            div
+                        `).join('')}
+                    div
+                div
+            `;
+            
+             Auto-play on load
+            setTimeout(() = speakWord(word.original), 500);
+        }
+
+         Enhanced interactive functions
+        function flipCard() {
+            isFlipped = !isFlipped;
+            displayFlashcard();
+            
+            if (isFlipped) {
+                const word = words[currentCardIndex];
+                word.timesStudied = (word.timesStudied  0) + 1;
+                studyStats.studiedWords.add(word.id);
+                studyStats.dailyProgress++;
+                updateStats();
+                updateMastery(word.id, true);
+                saveWords();
+            }
+        }
+
+        function selectQuizOption(element, selected, correct) {
+             Disable all options
+            document.querySelectorAll('.quiz-option').forEach(opt = {
+                opt.style.pointerEvents = 'none';
+                if (opt.textContent.trim() === correct) {
+                    opt.classList.add('correct');
+                } else if (opt === element && selected !== correct) {
+                    opt.classList.add('incorrect');
+                }
+            });
+            
+             Update stats and word progress
+            const word = words[currentCardIndex];
+            const isCorrect = selected === correct;
+            
+            studyStats.totalAnswered++;
+            word.totalAttempts = (word.totalAttempts  0) + 1;
+            
+            if (isCorrect) {
+                studyStats.correctAnswers++;
+                word.correctAttempts = (word.correctAttempts  0) + 1;
+                updateMastery(word.id, true);
+            } else {
+                updateMastery(word.id, false);
+                studyStats.weakWords.add(word.id);
+            }
+            
+            studyStats.studiedWords.add(word.id);
+            studyStats.dailyProgress++;
+            updateStats();
+            saveWords();
+            
+             Stop timer
+            clearInterval(timerInterval);
+            document.getElementById('timerDisplay').style.display = 'none';
+            
+             Auto advance after delay
+            setTimeout(() = {
+                nextCard();
+            }, 1500);
+        }
+
+        function selectListeningOption(element, selected, correct) {
+            selectQuizOption(element, selected, correct);
+        }
+
+        function checkTyping(event, correct) {
+            if (event.key === 'Enter') {
+                const input = event.target.value.trim();
+                const feedback = document.getElementById('typingFeedback');
+                const word = words[currentCardIndex];
+                
+                 Check for partial matches based on difficulty
+                let isCorrect = false;
+                if (difficulty === 'easy') {
+                    isCorrect = input.toLowerCase() === correct.toLowerCase();
+                } else if (difficulty === 'normal') {
+                     Allow minor typos
+                    isCorrect = levenshteinDistance(input.toLowerCase(), correct.toLowerCase()) = 1;
+                } else {
+                     Exact match required
+                    isCorrect = input === correct;
+                }
+                
+                studyStats.totalAnswered++;
+                word.totalAttempts = (word.totalAttempts  0) + 1;
+                
+                if (isCorrect) {
+                    feedback.innerHTML = 'div style=color #4caf50; font-weight 600; margin-top 10px;정답입니다! 🎉div';
+                    studyStats.correctAnswers++;
+                    word.correctAttempts = (word.correctAttempts  0) + 1;
+                    updateMastery(word.id, true);
+                } else {
+                    feedback.innerHTML = `div style=color #f44336; font-weight 600; margin-top 10px;정답 ${correct}br입력 ${input}div`;
+                    updateMastery(word.id, false);
+                    studyStats.weakWords.add(word.id);
+                }
+                
+                studyStats.studiedWords.add(word.id);
+                studyStats.dailyProgress++;
+                updateStats();
+                saveWords();
+                
+                 Stop timer
+                clearInterval(timerInterval);
+                document.getElementById('timerDisplay').style.display = 'none';
+                
+                setTimeout(() = {
+                    nextCard();
+                }, 1500);
+            }
+        }
+
+         Utility functions
+        function levenshteinDistance(str1, str2) {
+            const matrix = [];
+            for (let i = 0; i = str2.length; i++) {
+                matrix[i] = [i];
+            }
+            for (let j = 0; j = str1.length; j++) {
+                matrix[0][j] = j;
+            }
+            for (let i = 1; i = str2.length; i++) {
+                for (let j = 1; j = str1.length; j++) {
+                    if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1,
+                            matrix[i][j - 1] + 1,
+                            matrix[i - 1][j] + 1
+                        );
+                    }
+                }
+            }
+            return matrix[str2.length][str1.length];
+        }
+
+        function updateMastery(wordId, correct) {
+            const word = words.find(w = w.id === wordId);
+            if (!word) return;
+            
+            if (correct) {
+                word.masteryLevel = Math.min(5, (word.masteryLevel  0) + 0.5);
+            } else {
+                word.masteryLevel = Math.max(0, (word.masteryLevel  0) - 0.25);
+            }
+            
+             Round to nearest 0.5
+            word.masteryLevel = Math.round(word.masteryLevel  2)  2;
+        }
+
+        function speakWord(text) {
+            if ('speechSynthesis' in window) {
+                speechSynthesis.cancel();  Stop any ongoing speech
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.8;
+                utterance.pitch = 1;
+                speechSynthesis.speak(utterance);
+            } else {
+                alert('음성 기능을 지원하지 않는 브라우저입니다.');
+            }
+        }
+
+        function speakSlowly(text) {
+            if ('speechSynthesis' in window) {
+                speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.5;
+                utterance.pitch = 1;
+                speechSynthesis.speak(utterance);
+            }
+        }
+
+         Enhanced navigation
+        function nextCard() {
+            if (currentCardIndex  words.length - 1) {
+                currentCardIndex++;
+                isFlipped = false;
+                clearInterval(timerInterval);
+                document.getElementById('timerDisplay').style.display = 'none';
+                displayStudyContent();
+            } else {
+                 End of study session
+                showCompletionSummary();
+            }
+        }
+
+        function previousCard() {
+            if (currentCardIndex  0) {
+                currentCardIndex--;
+                isFlipped = false;
+                clearInterval(timerInterval);
+                document.getElementById('timerDisplay').style.display = 'none';
+                displayStudyContent();
+            }
+        }
+
+        function showCompletionSummary() {
+            const studyArea = document.getElementById('studyArea');
+            const accuracy = studyStats.totalAnswered  0 
+                 Math.round((studyStats.correctAnswers  studyStats.totalAnswered)  100)
+                 0;
+            
+            studyArea.innerHTML = `
+                div class=flashcard style=background linear-gradient(135deg, #4caf50 0%, #8bc34a 100%); color white;
+                    div class=card-content🎉 학습 완료!div
+                    div class=card-subtitle
+                        학습한 단어 ${studyStats.studiedWords.size}개br
+                        정확도 ${accuracy}%br
+                        분당 단어 ${calculateWPM()}개
+                    div
+                    div style=margin-top 20px;
+                        button class=nav-btn onclick=restartStudy() style=background rgba(255,255,255,0.2);다시 시작button
+                    div
+                    ${accuracy = 80  'div class=achievement-badge우수한 성과! 🏆div'  ''}
+                    ${studyStats.studiedWords.size = 10  'div class=achievement-badge열심히 공부했어요! 📚div'  ''}
+                div
+            `;
+            
+            document.getElementById('navButtons').style.display = 'none';
+        }
+
+        function restartStudy() {
+            currentCardIndex = 0;
+            isFlipped = false;
+            startTime = Date.now();
+            displayStudyContent();
+        }
+
+         Mode switching and initialization
+        function switchMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn = btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (mode === 'admin') {
+                document.getElementById('adminPanel').style.display = 'block';
+                document.getElementById('learningPanel').style.display = 'none';
+            } else {
+                document.getElementById('adminPanel').style.display = 'none';
+                document.getElementById('learningPanel').style.display = 'block';
+                updateStats();
+                checkDailyStreak();
+                setStudyMode('flashcard');
+            }
+        }
+
+        function updateNavigationButtons() {
+            const prevButton = document.getElementById('prevButton');
+            const nextButton = document.getElementById('nextButton');
+            
+            prevButton.disabled = currentCardIndex === 0;
+            nextButton.disabled = currentCardIndex === words.length - 1;
+        }
+
+        function updateProgress() {
+            const progressFill = document.getElementById('progressFill');
+            const progress = words.length  0  ((currentCardIndex + 1)  words.length)  100  0;
+            progressFill.style.width = progress + '%';
+        }
+
+        function shuffleWords() {
+            words = words.sort(() = Math.random() - 0.5);
+            currentCardIndex = 0;
+            isFlipped = false;
+            displayStudyContent();
+        }
+
+        function deleteWord(id) {
+            if (confirm('이 단어를 삭제하시겠습니까')) {
+                words = words.filter(word = word.id !== id);
+                saveWords();
+                updateWordList();
+                updateCategoryTags();
+                updateStats();
+            }
+        }
+
+         Data persistence
+        function saveWords() {
+            const data = {
+                words words,
+                stats studyStats,
+                lastSaved new Date().toISOString()
+            };
+             In a real application, this would save to a database
+            console.log('Data saved', data);
+        }
+
+        function loadWords() {
+             In a real application, this would load from a database
+             For demo purposes, we'll start with some sample data
+            if (words.length === 0) {
+                words = [
+                    {
+                        id 1,
+                        original Hello,
+                        pronunciation 헬로우,
+                        meaning 안녕하세요,
+                        category 인사말,
+                        priority 1,
+                        masteryLevel 2,
+                        addedDate new Date().toLocaleDateString(),
+                        timesStudied 5,
+                        correctAttempts 4,
+                        totalAttempts 5
+                    },
+                    {
+                        id 2,
+                        original Thank you,
+                        pronunciation 땡큐,
+                        meaning 감사합니다,
+                        category 인사말,
+                        priority 0,
+                        masteryLevel 3,
+                        addedDate new Date().toLocaleDateString(),
+                        timesStudied 8,
+                        correctAttempts 7,
+                        totalAttempts 8
+                    },
+                    {
+                        id 3,
+                        original Good morning,
+                        pronunciation 굿 모닝,
+                        meaning 좋은 아침입니다,
+                        category 인사말,
+                        priority 2,
+                        masteryLevel 1,
+                        addedDate new Date().toLocaleDateString(),
+                        timesStudied 3,
+                        correctAttempts 2,
+                        totalAttempts 4
+                    },
+                    {
+                        id 4,
+                        original Apple,
+                        pronunciation 애플,
+                        meaning 사과,
+                        category 음식,
+                        priority 0,
+                        masteryLevel 4,
+                        addedDate new Date().toLocaleDateString(),
+                        timesStudied 10,
+                        correctAttempts 9,
+                        totalAttempts 10
+                    },
+                    {
+                        id 5,
+                        original Beautiful,
+                        pronunciation 뷰티풀,
+                        meaning 아름다운,
+                        category 형용사,
+                        priority 3,
+                        masteryLevel 1,
+                        addedDate new Date().toLocaleDateString(),
+                        timesStudied 2,
+                        correctAttempts 1,
+                        totalAttempts 3
+                    }
+                ];
+            }
+        }
+
+         Initialize the app
+        init();!DOCTYPE html
+html lang=ko
+head
+    meta charset=UTF-8
+    meta name=viewport content=width=device-width, initial-scale=1.0
+    titleLingoMaster - 언어 학습 플랫폼title
+    style
+         {
+            margin 0;
+            padding 0;
+            box-sizing border-box;
+        }
+
+        body {
+            font-family 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height 100vh;
+            color #333;
+        }
+
+        .container {
+            max-width 1200px;
+            margin 0 auto;
+            padding 20px;
+        }
+
+        .header {
+            text-align center;
+            color white;
+            margin-bottom 30px;
+        }
+
+        .header h1 {
+            font-size 3rem;
+            font-weight 700;
+            margin-bottom 10px;
+            text-shadow 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size 1.2rem;
+            opacity 0.9;
+        }
+
+        .mode-selector {
+            display flex;
+            justify-content center;
+            gap 20px;
+            margin-bottom 30px;
+        }
+
+        .mode-btn {
+            background rgba(255,255,255,0.2);
+            color white;
+            border 2px solid rgba(255,255,255,0.3);
+            padding 15px 30px;
+            border-radius 50px;
+            cursor pointer;
+            font-size 1.1rem;
+            font-weight 600;
+            transition all 0.3s ease;
+            backdrop-filter blur(10px);
+        }
+
+        .mode-btnhover, .mode-btn.active {
+            background rgba(255,255,255,0.3);
+            border-color rgba(255,255,255,0.6);
+            transform translateY(-2px);
+            box-shadow 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .content-area {
+            background rgba(255,255,255,0.95);
+            border-radius 20px;
+            padding 30px;
+            box-shadow 0 20px 60px rgba(0,0,0,0.1);
+            backdrop-filter blur(20px);
+            margin-bottom 20px;
+        }
+
+         Admin Panel Styles 
+        .admin-panel {
+            display none;
+        }
+
+        .form-group {
+            margin-bottom 20px;
+        }
+
+        .form-group label {
+            display block;
+            font-weight 600;
+            margin-bottom 8px;
+            color #555;
+        }
+
+        .form-group input {
+            width 100%;
+            padding 15px;
+            border 2px solid #e1e5e9;
+            border-radius 12px;
+            font-size 1rem;
+            transition all 0.3s ease;
+        }
+
+        .form-group inputfocus {
+            outline none;
+            border-color #667eea;
+            box-shadow 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            background linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color white;
+            border none;
+            padding 15px 30px;
+            border-radius 12px;
+            font-size 1rem;
+            font-weight 600;
+            cursor pointer;
+            transition all 0.3s ease;
+        }
+
+        .btnhover {
+            transform translateY(-2px);
+            box-shadow 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .word-list {
+            margin-top 30px;
+        }
+
+        .word-item {
+            background #f8f9fa;
+            border-radius 12px;
+            padding 20px;
+            margin-bottom 15px;
+            display flex;
+            justify-content space-between;
+            align-items center;
+            transition all 0.3s ease;
+        }
+
+        .word-itemhover {
+            transform translateY(-2px);
+            box-shadow 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .word-details {
+            flex 1;
+        }
+
+        .original-word {
+            font-size 1.3rem;
+            font-weight 700;
+            color #333;
+            margin-bottom 5px;
+        }
+
+        .pronunciation {
+            font-size 1rem;
+            color #667eea;
+            font-style italic;
+            margin-bottom 5px;
+        }
+
+        .meaning {
+            font-size 1rem;
+            color #666;
+        }
+
+        .delete-btn {
+            background #ff6b6b;
+            color white;
+            border none;
+            padding 8px 16px;
+            border-radius 8px;
+            cursor pointer;
+            font-size 0.9rem;
+            transition all 0.3s ease;
+        }
+
+        .delete-btnhover {
+            background #ff5252;
+            transform scale(1.05);
+        }
+
+         Learning Panel Styles 
+        .learning-panel {
+            display none;
+        }
+
+        .stats-bar {
+            display flex;
+            justify-content space-around;
+            background linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color white;
+            padding 20px;
+            border-radius 15px;
+            margin-bottom 30px;
+        }
+
+        .stat-item {
+            text-align center;
+        }
+
+        .stat-value {
+            font-size 2rem;
+            font-weight 700;
+            display block;
+        }
+
+        .stat-label {
+            font-size 0.9rem;
+            opacity 0.8;
+        }
+
+        .study-controls {
+            display flex;
+            gap 15px;
+            margin-bottom 30px;
+            flex-wrap wrap;
+        }
+
+        .control-btn {
+            background rgba(102, 126, 234, 0.1);
+            color #667eea;
+            border 2px solid rgba(102, 126, 234, 0.2);
+            padding 12px 24px;
+            border-radius 25px;
+            cursor pointer;
+            font-weight 600;
+            transition all 0.3s ease;
+        }
+
+        .control-btnhover, .control-btn.active {
+            background #667eea;
+            color white;
+            transform translateY(-2px);
+        }
+
+        .flashcard {
+            background white;
+            border-radius 20px;
+            padding 40px;
+            text-align center;
+            box-shadow 0 15px 35px rgba(0,0,0,0.1);
+            min-height 300px;
+            display flex;
+            flex-direction column;
+            justify-content center;
+            cursor pointer;
+            transition all 0.3s ease;
+            border 3px solid transparent;
+        }
+
+        .flashcardhover {
+            transform translateY(-5px);
+            box-shadow 0 25px 50px rgba(0,0,0,0.15);
+            border-color rgba(102, 126, 234, 0.3);
+        }
+
+        .flashcard.flipped {
+            background linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color white;
+        }
+
+        .card-content {
+            font-size 2rem;
+            font-weight 700;
+            margin-bottom 20px;
+        }
+
+        .card-subtitle {
+            font-size 1.2rem;
+            opacity 0.7;
+            margin-bottom 10px;
+        }
+
+        .card-hint {
+            font-size 0.9rem;
+            opacity 0.6;
+            margin-top 20px;
+        }
+
+        .navigation-buttons {
+            display flex;
+            justify-content center;
+            gap 20px;
+            margin-top 30px;
+        }
+
+        .nav-btn {
+            background linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color white;
+            border none;
+            padding 15px 30px;
+            border-radius 25px;
+            font-size 1rem;
+            font-weight 600;
+            cursor pointer;
+            transition all 0.3s ease;
+            min-width 120px;
+        }
+
+        .nav-btnhover {
+            transform translateY(-2px);
+            box-shadow 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .nav-btndisabled {
+            opacity 0.5;
+            cursor not-allowed;
+            transform none;
+            box-shadow none;
+        }
+
+        .progress-bar {
+            background #e1e5e9;
+            border-radius 10px;
+            height 8px;
+            margin 20px 0;
+            overflow hidden;
+        }
+
+        .progress-fill {
+            background linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height 100%;
+            border-radius 10px;
+            transition width 0.3s ease;
+        }
+
+        .quiz-options {
+            display grid;
+            grid-template-columns 1fr 1fr;
+            gap 15px;
+            margin-top 20px;
+        }
+
+        .quiz-option {
+            background rgba(102, 126, 234, 0.1);
+            border 2px solid rgba(102, 126, 234, 0.2);
+            padding 20px;
+            border-radius 15px;
+            cursor pointer;
+            transition all 0.3s ease;
+            text-align center;
+            font-weight 600;
+        }
+
+        .quiz-optionhover {
+            background rgba(102, 126, 234, 0.2);
+            transform translateY(-2px);
+        }
+
+        .quiz-option.correct {
+            background #4caf50;
+            color white;
+            border-color #4caf50;
+        }
+
+        .quiz-option.incorrect {
+            background #f44336;
+            color white;
+            border-color #f44336;
+        }
+
+        .empty-state {
+            text-align center;
+            padding 60px 20px;
+            color #666;
+        }
+
+        .empty-state h3 {
+            font-size 1.5rem;
+            margin-bottom 10px;
+        }
+
+        .empty-state p {
+            font-size 1rem;
+            opacity 0.7;
+        }
+
+         Advanced Features Styles 
+        .difficulty-selector {
+            display flex;
+            gap 10px;
+            margin 20px 0;
+            justify-content center;
+        }
+
+        .difficulty-btn {
+            background rgba(102, 126, 234, 0.1);
+            color #667eea;
+            border 2px solid rgba(102, 126, 234, 0.2);
+            padding 8px 16px;
+            border-radius 20px;
+            cursor pointer;
+            font-size 0.9rem;
+            font-weight 600;
+            transition all 0.3s ease;
+        }
+
+        .difficulty-btn.active {
+            background #667eea;
+            color white;
+        }
+
+        .word-search {
+            margin-bottom 20px;
+            position relative;
+        }
+
+        .word-search input {
+            width 100%;
+            padding 15px 45px 15px 15px;
+            border 2px solid #e1e5e9;
+            border-radius 25px;
+            font-size 1rem;
+        }
+
+        .word-search .search-icon {
+            position absolute;
+            right 15px;
+            top 50%;
+            transform translateY(-50%);
+            color #667eea;
+        }
+
+        .category-tags {
+            display flex;
+            flex-wrap wrap;
+            gap 10px;
+            margin 15px 0;
+        }
+
+        .category-tag {
+            background rgba(102, 126, 234, 0.1);
+            color #667eea;
+            padding 5px 12px;
+            border-radius 15px;
+            font-size 0.8rem;
+            font-weight 600;
+            cursor pointer;
+            transition all 0.3s ease;
+        }
+
+        .category-taghover, .category-tag.active {
+            background #667eea;
+            color white;
+        }
+
+        .streak-counter {
+            background linear-gradient(45deg, #ff6b6b, #feca57);
+            color white;
+            padding 15px;
+            border-radius 15px;
+            text-align center;
+            margin-bottom 20px;
+            font-weight 700;
+        }
+
+        .streak-fire {
+            font-size 1.5rem;
+            margin-right 10px;
+        }
+
+        .achievement-badge {
+            display inline-block;
+            background linear-gradient(45deg, #feca57, #ff9ff3);
+            color white;
+            padding 5px 10px;
+            border-radius 10px;
+            font-size 0.7rem;
+            font-weight 600;
+            margin 2px;
+            animation pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform scale(1); }
+            50% { transform scale(1.05); }
+            100% { transform scale(1); }
+        }
+
+        .timer-display {
+            background rgba(255, 107, 107, 0.1);
+            color #ff6b6b;
+            padding 10px 20px;
+            border-radius 25px;
+            font-size 1.2rem;
+            font-weight 700;
+            text-align center;
+            margin-bottom 20px;
+        }
+
+        .voice-controls {
+            display flex;
+            justify-content center;
+            gap 15px;
+            margin 20px 0;
+        }
+
+        .voice-btn {
+            background rgba(102, 126, 234, 0.1);
+            color #667eea;
+            border 2px solid rgba(102, 126, 234, 0.2);
+            padding 12px;
+            border-radius 50%;
+            cursor pointer;
+            transition all 0.3s ease;
+            width 50px;
+            height 50px;
+            display flex;
+            align-items center;
+            justify-content center;
+        }
+
+        .voice-btnhover, .voice-btn.active {
+            background #667eea;
+            color white;
+            transform scale(1.1);
+        }
+
+        .mastery-indicator {
+            display flex;
+            gap 5px;
+            justify-content center;
+            margin 10px 0;
+        }
+
+        .mastery-dot {
+            width 12px;
+            height 12px;
+            border-radius 50%;
+            background #e1e5e9;
+            transition all 0.3s ease;
+        }
+
+        .mastery-dot.filled {
+            background linear-gradient(45deg, #4caf50, #8bc34a);
+        }
+
+        .word-priority {
+            display flex;
+            align-items center;
+            gap 5px;
+            margin-top 10px;
+        }
+
+        .priority-star {
+            color #ffd700;
+            cursor pointer;
+            transition all 0.3s ease;
+            font-size 1.2rem;
+        }
+
+        .priority-starhover {
+            transform scale(1.2);
+        }
+
+        .daily-goal {
+            background rgba(76, 175, 80, 0.1);
+            color #4caf50;
+            padding 15px;
+            border-radius 15px;
+            text-align center;
+            margin-bottom 20px;
+            font-weight 600;
+        }
+
+        .export-import {
+            display flex;
+            gap 10px;
+            margin-bottom 20px;
+        }
+
+        .file-input {
+            display none;
+        }
+
+        .file-label {
+            background rgba(102, 126, 234, 0.1);
+            color #667eea;
+            border 2px solid rgba(102, 126, 234, 0.2);
+            padding 10px 20px;
+            border-radius 12px;
+            cursor pointer;
+            font-weight 600;
+            transition all 0.3s ease;
+        }
+
+        .file-labelhover {
+            background rgba(102, 126, 234, 0.2);
+        }
+
+        @media (max-width 768px) {
+            .header h1 {
+                font-size 2rem;
+            }
+            
+            .mode-selector {
+                flex-direction column;
+                align-items center;
+            }
+            
+            .stats-bar {
+                flex-direction column;
+                gap 15px;
+            }
+            
+            .study-controls {
+                justify-content center;
+            }
+            
+            .quiz-options {
+                grid-template-columns 1fr;
+            }
+        }
+    style
+head
+body
+    div class=container
+        div class=header
+            h1LingoMasterh1
+            p스마트한 언어 학습의 시작p
+        div
+
+        div class=mode-selector
+            button class=mode-btn active onclick=switchMode('admin')관리자 모드button
+            button class=mode-btn onclick=switchMode('learning')학습 모드button
+        div
+
+        !-- Admin Panel --
+        div class=content-area admin-panel id=adminPanel style=display block;
+            h2 style=margin-bottom 30px; color #333; text-align center;단어 관리h2
+            
+            !-- ImportExport Section --
+            div class=export-import
+                label for=importFile class=file-label📁 CSV 가져오기label
+                input type=file id=importFile class=file-input accept=.csv onchange=importCSV(event)
+                button class=file-label onclick=exportCSV() style=border none;💾 CSV 내보내기button
+                button class=file-label onclick=clearAllWords() style=border none; background rgba(255, 107, 107, 0.1); color #ff6b6b;🗑️ 전체 삭제button
+            div
+
+            div class=form-group
+                label for=originalWord원언어 표기label
+                input type=text id=originalWord placeholder=예 Hello
+            div
+            
+            div class=form-group
+                label for=pronunciation발음 표기label
+                input type=text id=pronunciation placeholder=예 헬로우
+            div
+            
+            div class=form-group
+                label for=meaning의미label
+                input type=text id=meaning placeholder=예 안녕하세요
+            div
+
+            div class=form-group
+                label for=category카테고리 (선택사항)label
+                input type=text id=category placeholder=예 인사말, 음식, 여행
+            div
+            
+            button class=btn onclick=addWord()단어 추가button
+
+            !-- Search and Filter --
+            div class=word-search
+                input type=text id=searchInput placeholder=단어 검색... onkeyup=searchWords()
+                span class=search-icon🔍span
+            div
+
+            div class=category-tags id=categoryTags
+                !-- Category tags will be displayed here --
+            div
+            
+            div class=word-list id=wordList
+                !-- Words will be displayed here --
+            div
+        div
+
+        !-- Learning Panel --
+        div class=content-area learning-panel id=learningPanel
+            !-- Streak Counter --
+            div class=streak-counter id=streakCounter style=display none;
+                span class=streak-fire🔥span
+                span id=streakNumber0span일 연속 학습!
+            div
+
+            !-- Daily Goal --
+            div class=daily-goal
+                📊 일일 목표 span id=dailyProgress0span20 단어 학습
+                div style=margin-top 5px;
+                    div class=progress-bar style=height 6px; margin 5px 0;
+                        div class=progress-fill id=dailyProgressFill style=width 0%div
+                    div
+                div
+            div
+
+            div class=stats-bar
+                div class=stat-item
+                    span class=stat-value id=totalWords0span
+                    span class=stat-label총 단어span
+                div
+                div class=stat-item
+                    span class=stat-value id=studiedWords0span
+                    span class=stat-label학습한 단어span
+                div
+                div class=stat-item
+                    span class=stat-value id=accuracy0%span
+                    span class=stat-label정확도span
+                div
+                div class=stat-item
+                    span class=stat-value id=wpm0span
+                    span class=stat-label분당 단어span
+                div
+            div
+
+            div class=study-controls
+                button class=control-btn active onclick=setStudyMode('flashcard')플래시카드button
+                button class=control-btn onclick=setStudyMode('quiz')퀴즈button
+                button class=control-btn onclick=setStudyMode('typing')타이핑 연습button
+                button class=control-btn onclick=setStudyMode('listening')듣기 연습button
+                button class=control-btn onclick=shuffleWords()섞기button
+                button class=control-btn onclick=studyWeakWords()약점 보강button
+            div
+
+            !-- Difficulty Selector --
+            div class=difficulty-selector
+                button class=difficulty-btn active onclick=setDifficulty('easy')쉬움button
+                button class=difficulty-btn onclick=setDifficulty('normal')보통button
+                button class=difficulty-btn onclick=setDifficulty('hard')어려움button
+            div
+
+            !-- Timer Display --
+            div class=timer-display id=timerDisplay style=display none;
+                ⏱️ span id=timerValue30span초
+            div
+
+            div class=progress-bar
+                div class=progress-fill id=progressFill style=width 0%div
+            div
+
+            div id=studyArea
+                !-- Study content will be displayed here --
+            div
+
+            div class=navigation-buttons id=navButtons style=display none;
+                button class=nav-btn onclick=previousCard() id=prevButton이전button
+                button class=nav-btn onclick=markDifficult() id=difficultButton어려움 표시button
+                button class=nav-btn onclick=nextCard() id=nextButton다음button
+            div
+        div
+    div
+
+    script
+         Data storage
+        let words = [];
+        let currentMode = 'admin';
+        let studyMode = 'flashcard';
+        let currentCardIndex = 0;
+        let isFlipped = false;
+        let studyStats = {
+            totalAnswered 0,
+            correctAnswers 0,
+            studiedWords new Set()
+        };
+
+         Initialize app
+        function init() {
+            loadWords();
+            updateWordList();
+            updateStats();
+        }
+
+         Mode switching
+        function switchMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn = btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (mode === 'admin') {
+                document.getElementById('adminPanel').style.display = 'block';
+                document.getElementById('learningPanel').style.display = 'none';
+            } else {
+                document.getElementById('adminPanel').style.display = 'none';
+                document.getElementById('learningPanel').style.display = 'block';
+                updateStats();
+                setStudyMode('flashcard');
+            }
+        }
+
+         Word management
+        function addWord() {
+            const original = document.getElementById('originalWord').value.trim();
+            const pronunciation = document.getElementById('pronunciation').value.trim();
+            const meaning = document.getElementById('meaning').value.trim();
+
+            if (!original  !pronunciation  !meaning) {
+                alert('모든 필드를 입력해주세요.');
+                return;
+            }
+
+            const word = {
+                id Date.now(),
+                original,
+                pronunciation,
+                meaning,
+                addedDate new Date().toLocaleDateString()
+            };
+
+            words.push(word);
+            saveWords();
+            updateWordList();
+            clearForm();
+            
+             Show success feedback
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '추가됨!';
+            btn.style.background = '#4caf50';
+            setTimeout(() = {
+                btn.textContent = originalText;
+                btn.style.background = '';
+            }, 1500);
+        }
+
+        function deleteWord(id) {
+            if (confirm('이 단어를 삭제하시겠습니까')) {
+                words = words.filter(word = word.id !== id);
+                saveWords();
+                updateWordList();
+                updateStats();
+            }
+        }
+
+        function clearForm() {
+            document.getElementById('originalWord').value = '';
+            document.getElementById('pronunciation').value = '';
+            document.getElementById('meaning').value = '';
+        }
+
+        function updateWordList() {
+            const wordList = document.getElementById('wordList');
+            
+            if (words.length === 0) {
+                wordList.innerHTML = `
+                    div class=empty-state
+                        h3아직 단어가 없습니다h3
+                        p위 양식을 사용해서 첫 번째 단어를 추가해보세요.p
+                    div
+                `;
+                return;
+            }
+
+            wordList.innerHTML = words.map(word = `
+                div class=word-item
+                    div class=word-details
+                        div class=original-word${word.original}div
+                        div class=pronunciation${word.pronunciation}div
+                        div class=meaning${word.meaning}div
+                    div
+                    button class=delete-btn onclick=deleteWord(${word.id})삭제button
+                div
+            `).join('');
+        }
+
+         Study modes
+        function setStudyMode(mode) {
+            studyMode = mode;
+            document.querySelectorAll('.control-btn').forEach(btn = btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            currentCardIndex = 0;
+            isFlipped = false;
+            displayStudyContent();
+        }
+
+        function displayStudyContent() {
+            const studyArea = document.getElementById('studyArea');
+            const navButtons = document.getElementById('navButtons');
+            
+            if (words.length === 0) {
+                studyArea.innerHTML = `
+                    div class=empty-state
+                        h3학습할 단어가 없습니다h3
+                        p관리자 모드에서 단어를 추가해주세요.p
+                    div
+                `;
+                navButtons.style.display = 'none';
+                return;
+            }
+
+            navButtons.style.display = 'flex';
+            updateNavigationButtons();
+            updateProgress();
+
+            switch (studyMode) {
+                case 'flashcard'
+                    displayFlashcard();
+                    break;
+                case 'quiz'
+                    displayQuiz();
+                    break;
+                case 'typing'
+                    displayTyping();
+                    break;
+            }
+        }
+
+        function displayFlashcard() {
+            const word = words[currentCardIndex];
+            const studyArea = document.getElementById('studyArea');
+            
+            studyArea.innerHTML = `
+                div class=flashcard ${isFlipped  'flipped'  ''} onclick=flipCard()
+                    div class=card-content
+                        ${isFlipped  word.meaning  word.original}
+                    div
+                    div class=card-subtitle
+                        ${isFlipped  ''  word.pronunciation}
+                    div
+                    div class=card-hint
+                        ${isFlipped  '클릭해서 앞면 보기'  '클릭해서 뜻 보기'}
+                    div
+                div
+            `;
+        }
+
+        function displayQuiz() {
+            const word = words[currentCardIndex];
+            const studyArea = document.getElementById('studyArea');
+            
+             Generate wrong options
+            const wrongOptions = words
+                .filter(w = w.id !== word.id)
+                .sort(() = Math.random() - 0.5)
+                .slice(0, 3)
+                .map(w = w.meaning);
+            
+            const allOptions = [word.meaning, ...wrongOptions].sort(() = Math.random() - 0.5);
+            
+            studyArea.innerHTML = `
+                div class=flashcard
+                    div class=card-content${word.original}div
+                    div class=card-subtitle${word.pronunciation}div
+                    div class=quiz-options
+                        ${allOptions.map(option = `
+                            div class=quiz-option onclick=selectQuizOption(this, '${option}', '${word.meaning}')
+                                ${option}
+                            div
+                        `).join('')}
+                    div
+                div
+            `;
+        }
+
+        function displayTyping() {
+            const word = words[currentCardIndex];
+            const studyArea = document.getElementById('studyArea');
+            
+            studyArea.innerHTML = `
+                div class=flashcard
+                    div class=card-content${word.meaning}div
+                    div class=card-subtitle이 단어를 입력하세요div
+                    div style=margin 20px 0;
+                        input type=text id=typingInput placeholder=여기에 입력하세요 
+                               style=width 100%; padding 15px; font-size 1.2rem; border 2px solid #e1e5e9; border-radius 12px; text-align center;
+                               onkeypress=checkTyping(event, '${word.original}')
+                    div
+                    div id=typingFeedbackdiv
+                div
+            `;
+            
+            document.getElementById('typingInput').focus();
+        }
+
+         Interactive functions
+        function flipCard() {
+            isFlipped = !isFlipped;
+            displayFlashcard();
+            
+            if (isFlipped) {
+                studyStats.studiedWords.add(words[currentCardIndex].id);
+                updateStats();
+            }
+        }
+
+        function selectQuizOption(element, selected, correct) {
+             Disable all options
+            document.querySelectorAll('.quiz-option').forEach(opt = {
+                opt.style.pointerEvents = 'none';
+                if (opt.textContent.trim() === correct) {
+                    opt.classList.add('correct');
+                } else if (opt === element && selected !== correct) {
+                    opt.classList.add('incorrect');
+                }
+            });
+            
+             Update stats
+            studyStats.totalAnswered++;
+            if (selected === correct) {
+                studyStats.correctAnswers++;
+            }
+            studyStats.studiedWords.add(words[currentCardIndex].id);
+            updateStats();
+            
+             Auto advance after delay
+            setTimeout(() = {
+                nextCard();
+            }, 1500);
+        }
+
+        function checkTyping(event, correct) {
+            if (event.key === 'Enter') {
+                const input = event.target.value.trim().toLowerCase();
+                const feedback = document.getElementById('typingFeedback');
+                
+                studyStats.totalAnswered++;
+                
+                if (input === correct.toLowerCase()) {
+                    feedback.innerHTML = 'div style=color #4caf50; font-weight 600; margin-top 10px;정답입니다! 🎉div';
+                    studyStats.correctAnswers++;
+                } else {
+                    feedback.innerHTML = `div style=color #f44336; font-weight 600; margin-top 10px;정답 ${correct}div`;
+                }
+                
+                studyStats.studiedWords.add(words[currentCardIndex].id);
+                updateStats();
+                
+                setTimeout(() = {
+                    nextCard();
+                }, 1500);
+            }
+        }
+
+         Navigation
+        function nextCard() {
+            if (currentCardIndex  words.length - 1) {
+                currentCardIndex++;
+                isFlipped = false;
+                displayStudyContent();
+            }
+        }
+
+        function previousCard() {
+            if (currentCardIndex  0) {
+                currentCardIndex--;
+                isFlipped = false;
+                displayStudyContent();
+            }
+        }
+
+        function shuffleWords() {
+            words = words.sort(() = Math.random() - 0.5);
+            currentCardIndex = 0;
+            isFlipped = false;
+            displayStudyContent();
+        }
+
+        function updateNavigationButtons() {
+            const prevButton = document.getElementById('prevButton');
+            const nextButton = document.getElementById('nextButton');
+            
+            prevButton.disabled = currentCardIndex === 0;
+            nextButton.disabled = currentCardIndex === words.length - 1;
+        }
+
+        function updateProgress() {
+            const progressFill = document.getElementById('progressFill');
+            const progress = words.length  0  ((currentCardIndex + 1)  words.length)  100  0;
+            progressFill.style.width = progress + '%';
+        }
+
+        function updateStats() {
+            document.getElementById('totalWords').textContent = words.length;
+            document.getElementById('studiedWords').textContent = studyStats.studiedWords.size;
+            
+            const accuracy = studyStats.totalAnswered  0 
+                 Math.round((studyStats.correctAnswers  studyStats.totalAnswered)  100)
+                 0;
+            document.getElementById('accuracy').textContent = accuracy + '%';
+        }
+
+         Data persistence
+        function saveWords() {
+            const data = {
+                words words,
+                stats studyStats
+            };
+             In a real application, this would save to a database
+             For now, we'll use a simple variable storage
+            console.log('Data saved', data);
+        }
+
+        function loadWords() {
+             In a real application, this would load from a database
+             For demo purposes, we'll start with some sample data
+            if (words.length === 0) {
+                words = [
+                    {
+                        id 1,
+                        original Hello,
+                        pronunciation 헬로우,
+                        meaning 안녕하세요,
+                        addedDate new Date().toLocaleDateString()
+                    },
+                    {
+                        id 2,
+                        original Thank you,
+                        pronunciation 땡큐,
+                        meaning 감사합니다,
+                        addedDate new Date().toLocaleDateString()
+                    },
+                    {
+                        id 3,
+                        original Good morning,
+                        pronunciation 굿 모닝,
+                        meaning 좋은 아침입니다,
+                        addedDate new Date().toLocaleDateString()
+                    }
+                ];
+            }
+        }
+
+         Initialize the app
+        init();
+    script
+body
+html
