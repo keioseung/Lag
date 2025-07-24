@@ -157,14 +157,21 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
   }
 
   const handleSaveAll = async () => {
-    if (parsedWords.length === 0) return
+    if (parsedWords.length === 0) {
+      showNotification('저장할 단어가 없습니다', 'error')
+      return
+    }
 
     setIsSaving(true)
     let successCount = 0
     let errorCount = 0
 
+    console.log('저장 시작 - 파싱된 단어 수:', parsedWords.length)
+
     for (const word of parsedWords) {
       try {
+        console.log('저장 중인 단어:', word)
+        
         const wordData = {
           ...word,
           priority: 0,
@@ -175,27 +182,47 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
           added_date: new Date().toISOString().split('T')[0],
           difficulty_level: 1,
           is_active: true,
+          is_favorite: false,
           tags: [],
           notes: null
         }
 
-        const response = await apiClient.createWord(wordData)
-        
-        if (response.error) {
-          console.error('백엔드 API 오류:', response.error)
-          if (supabase) {
+        console.log('전송할 데이터:', wordData)
+
+        // 먼저 Supabase로 시도
+        if (supabase) {
+          try {
+            console.log('Supabase 저장 시도 중...')
             const { data, error } = await supabase
               .from('words')
               .insert([wordData])
               .select()
               .single()
             
-            if (error) throw error
+            if (error) {
+              console.error('Supabase 저장 오류:', error)
+              throw error
+            }
+            
+            console.log('Supabase 저장 성공:', data)
             successCount++
-          } else {
-            errorCount++
+            continue // 성공하면 다음 단어로
+          } catch (supabaseError) {
+            console.error('Supabase 저장 실패, 백엔드 API 시도:', supabaseError)
           }
         } else {
+          console.log('Supabase 클라이언트가 없습니다. 백엔드 API만 사용합니다.')
+        }
+
+        // Supabase 실패 시 백엔드 API 시도
+        console.log('백엔드 API 저장 시도 중...')
+        const response = await apiClient.createWord(wordData)
+        
+        if (response.error) {
+          console.error('백엔드 API 오류:', response.error)
+          errorCount++
+        } else {
+          console.log('백엔드 API 저장 성공:', response.data)
           successCount++
         }
       } catch (error) {
@@ -205,6 +232,8 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
     }
 
     setIsSaving(false)
+    
+    console.log(`저장 완료 - 성공: ${successCount}, 실패: ${errorCount}`)
     
     if (successCount > 0) {
       setBulkInput('')
