@@ -65,17 +65,69 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
   const parseChineseInput = (input: string): ParsedWord[] => {
     const lines = input.trim().split('\n').filter(line => line.trim())
     const parsed: ParsedWord[] = []
-
-    for (const line of lines) {
-      const parts = line.split('\t')
-      if (parts.length >= 3) {
-        const [original, pronunciation, meaning, category = '중국어'] = parts
-        parsed.push({
-          original: original.trim(),
-          pronunciation: pronunciation.trim(),
-          meaning: meaning.trim(),
-          category: category.trim()
-        })
+    
+    // 헤더 행과 구분선 제거
+    const filteredLines = lines.filter(line => {
+      // 구분선 제거
+      if (line.includes('---')) return false
+      
+      // 헤더 행 제거 (한자, 중국어, 단어, 한국어 등이 포함된 행)
+      if (line.includes('|') && (
+        line.includes('한자') || 
+        line.includes('중국어') || 
+        line.includes('단어') ||
+        line.includes('한국어') ||
+        line.includes('발음') ||
+        line.includes('의미')
+      )) return false
+      
+      return true
+    })
+    
+    for (const line of filteredLines) {
+      // 파이프(|)로 구분된 테이블 행 처리
+      if (line.includes('|')) {
+        const parts = line.split('|').map(part => part.trim()).filter(part => part)
+        
+        if (parts.length >= 3) {
+          // 첫 번째 열이 한자/단어, 두 번째 열이 발음, 세 번째 열이 의미
+          const original = parts[0]
+          const pronunciation = parts[1]
+          const meaning = parts[2]
+          const category = parts[3] || '중국어'
+          
+          // 의미가 있는 데이터만 추가 (빈 문자열이나 구두점만 있는 경우 제외)
+          if (original && pronunciation && meaning && 
+              !original.match(/^[，。！？；：""''（）【】\s]+$/) &&
+              !pronunciation.match(/^[，。！？；：""''（）【】\s]+$/) &&
+              !meaning.match(/^[，。！？；：""''（）【】\s]+$/)) {
+            
+            // 구두점이나 특수문자만 있는 경우 제외
+            const cleanOriginal = original.replace(/[，。！？；：""''（）【】\s]/g, '')
+            const cleanPronunciation = pronunciation.replace(/[，。！？；：""''（）【】\s]/g, '')
+            
+            if (cleanOriginal.length > 0 && cleanPronunciation.length > 0) {
+              parsed.push({
+                original: original.trim(),
+                pronunciation: pronunciation.trim(),
+                meaning: meaning.trim(),
+                category: category.trim()
+              })
+            }
+          }
+        }
+      } else {
+        // 탭으로 구분된 기존 형식도 지원
+        const parts = line.split('\t')
+        if (parts.length >= 3) {
+          const [original, pronunciation, meaning, category = '중국어'] = parts
+          parsed.push({
+            original: original.trim(),
+            pronunciation: pronunciation.trim(),
+            meaning: meaning.trim(),
+            category: category.trim()
+          })
+        }
       }
     }
 
