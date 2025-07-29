@@ -25,18 +25,26 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",  # Next.js 프론트엔드 주소
-        "https://mmo-production-34bc.up.railway.app",  # 프로덕션 프론트엔드
-        "https://product2-production.up.railway.app",  # 프로덕션 백엔드
+        "http://localhost:3000",  # Next.js 프론트엔드 주소 (개발)
+        "https://lag-production.up.railway.app",  # 현재 프로덕션 프론트엔드
+        "https://mmo-production-34bc.up.railway.app",  # 기존 프로덕션 프론트엔드
+        "https://product2-production.up.railway.app",  # 기존 프로덕션 백엔드
+        "*",  # 모든 도메인 허용 (개발용, 프로덕션에서는 제거 권장)
     ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 @app.get("/")
 async def root():
     return {"message": "LingoMaster API에 오신 것을 환영합니다!"}
+
+@app.get("/health")
+async def health_check():
+    """API 상태 확인"""
+    return {"status": "healthy", "message": "LingoMaster API is running"}
 
 # 단어 관련 엔드포인트
 @app.get("/words/", response_model=List[WordResponse])

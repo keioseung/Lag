@@ -68,20 +68,26 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
   const parseChineseInput = (input: string): ParsedWord[] => {
     const lines = input.trim().split('\n').filter(line => line.trim())
     const parsed: ParsedWord[] = []
+    const seenWords = new Set<string>() // 중복 단어 체크용
     
     // 헤더 행과 구분선 제거
     const filteredLines = lines.filter(line => {
       // 구분선 제거
       if (line.includes('---')) return false
       
-      // 헤더 행 제거 (한자, 중국어, 단어, 한국어 등이 포함된 행)
+      // 헤더 행 제거 (다양한 헤더 패턴)
       if (line.includes('|') && (
         line.includes('한자') || 
         line.includes('중국어') || 
         line.includes('단어') ||
         line.includes('한국어') ||
         line.includes('발음') ||
-        line.includes('의미')
+        line.includes('의미') ||
+        line.includes('뜻') ||
+        line.includes('표기') ||
+        line.includes('---') ||
+        line.includes('中国어') ||
+        line.includes('단어')
       )) return false
       
       return true
@@ -94,16 +100,32 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
         
         if (parts.length >= 3) {
           // 첫 번째 열이 한자/단어, 두 번째 열이 발음, 세 번째 열이 의미
-          const original = parts[0]
-          const pronunciation = parts[1]
-          const meaning = parts[2]
+          let original = parts[0]
+          let pronunciation = parts[1]
+          let meaning = parts[2]
           const category = parts[3] || '중국어'
+          
+          // 특수문자 및 불필요한 문자 제거
+          original = original.replace(/["""]/g, '').trim()
+          pronunciation = pronunciation.replace(/["""]/g, '').trim()
+          meaning = meaning.replace(/["""]/g, '').trim()
           
           // 의미가 있는 데이터만 추가 (빈 문자열이나 구두점만 있는 경우 제외)
           if (original && pronunciation && meaning && 
               original.length > 0 && pronunciation.length > 0 && meaning.length > 0 &&
-              !original.match(/^[^\w\s]*$/) && !pronunciation.match(/^[^\w\s]*$/) && !meaning.match(/^[^\w\s]*$/)) {
-            parsed.push({ original, pronunciation, meaning, category })
+              !original.match(/^[^\w\s]*$/) && 
+              !pronunciation.match(/^[^\w\s]*$/) && 
+              !meaning.match(/^[^\w\s]*$/) &&
+              !original.match(/^[0-9\s\-\.]+$/) && // 숫자나 구두점만 있는 경우 제외
+              !pronunciation.match(/^[0-9\s\-\.]+$/) &&
+              !meaning.match(/^[0-9\s\-\.]+$/)) {
+            
+            // 중복 체크
+            const wordKey = `${original}-${pronunciation}`
+            if (!seenWords.has(wordKey)) {
+              seenWords.add(wordKey)
+              parsed.push({ original, pronunciation, meaning, category })
+            }
           }
         }
       } else {
@@ -111,16 +133,32 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
         const parts = line.split('\t').map(part => part.trim()).filter(part => part)
         
         if (parts.length >= 3) {
-          const original = parts[0]
-          const pronunciation = parts[1]
-          const meaning = parts[2]
+          let original = parts[0]
+          let pronunciation = parts[1]
+          let meaning = parts[2]
           const category = parts[3] || '중국어'
+          
+          // 특수문자 및 불필요한 문자 제거
+          original = original.replace(/["""]/g, '').trim()
+          pronunciation = pronunciation.replace(/["""]/g, '').trim()
+          meaning = meaning.replace(/["""]/g, '').trim()
           
           // 의미가 있는 데이터만 추가
           if (original && pronunciation && meaning && 
               original.length > 0 && pronunciation.length > 0 && meaning.length > 0 &&
-              !original.match(/^[^\w\s]*$/) && !pronunciation.match(/^[^\w\s]*$/) && !meaning.match(/^[^\w\s]*$/)) {
-            parsed.push({ original, pronunciation, meaning, category })
+              !original.match(/^[^\w\s]*$/) && 
+              !pronunciation.match(/^[^\w\s]*$/) && 
+              !meaning.match(/^[^\w\s]*$/) &&
+              !original.match(/^[0-9\s\-\.]+$/) &&
+              !pronunciation.match(/^[0-9\s\-\.]+$/) &&
+              !meaning.match(/^[0-9\s\-\.]+$/)) {
+            
+            // 중복 체크
+            const wordKey = `${original}-${pronunciation}`
+            if (!seenWords.has(wordKey)) {
+              seenWords.add(wordKey)
+              parsed.push({ original, pronunciation, meaning, category })
+            }
           }
         }
       }
@@ -399,12 +437,20 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      입력 형식: 중국어글자 탭 발음 탭 의미 탭 카테고리
+                      입력 형식: 중국어글자 탭 발음 탭 의미 탭 카테고리 (또는 테이블 형식)
                     </label>
                     <textarea
                       value={bulkInput}
                       onChange={(e) => setBulkInput(e.target.value)}
-                      placeholder={`你好\tnǐ hǎo\t안녕하세요\t인사말\n谢谢\txiè xie\t감사합니다\t인사말\n再见\tzài jiàn\t안녕히 가세요\t인사말`}
+                      placeholder={`# 탭으로 구분된 형식:
+你好\tnǐ hǎo\t안녕하세요\t인사말
+谢谢\txiè xie\t감사합니다\t인사말
+
+# 또는 테이블 형식:
+| 중국어 단어 | 한국어 발음 | 의미 |
+| --- | --- | --- |
+| 在 | 짜이 | ~에 있다, ~에서 |
+| 一个 | 이거 | 하나의 |`}
                       className="w-full h-48 md:h-64 bg-white/5 border border-white/20 rounded-xl p-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-sm md:text-base"
                     />
                   </div>
