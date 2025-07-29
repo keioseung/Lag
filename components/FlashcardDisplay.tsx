@@ -221,27 +221,7 @@ export default function FlashcardDisplay({ word, showAnswer, isFlipping, onFlip,
         }`}></div>
       </div>
 
-      {/* 키보드 단축키 안내 */}
-      <div className="text-center mt-8 text-sm text-white/60">
-        <div className="flex justify-center space-x-4">
-          <span className="flex items-center">
-            <kbd className="px-2 py-1 bg-white/20 rounded text-xs mr-2">←</kbd>
-            이전
-          </span>
-          <span className="flex items-center">
-            <kbd className="px-2 py-1 bg-white/20 rounded text-xs mr-2">Space</kbd>
-            뒤집기
-          </span>
-          <span className="flex items-center">
-            <kbd className="px-2 py-1 bg-white/20 rounded text-xs mr-2">→</kbd>
-            다음
-          </span>
-          <span className="flex items-center">
-            <kbd className="px-2 py-1 bg-white/20 rounded text-xs mr-2">Ctrl+A</kbd>
-            관리자
-          </span>
-        </div>
-      </div>
+
     </div>
   )
 } 
