@@ -66,7 +66,9 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
   }
 
   const parseChineseInput = (input: string): ParsedWord[] => {
+    console.log('🔍 파싱 시작 - 입력 텍스트:', input)
     const lines = input.trim().split('\n').filter(line => line.trim())
+    console.log('📝 분리된 라인 수:', lines.length)
     const parsed: ParsedWord[] = []
     const seenWords = new Set<string>() // 중복 단어 체크용
     
@@ -92,6 +94,7 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
       
       return true
     })
+    console.log('🔍 필터링된 라인 수:', filteredLines.length)
     
     for (const line of filteredLines) {
       // 파이프(|)로 구분된 테이블 행 처리
@@ -164,6 +167,7 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
       }
     }
     
+    console.log('✅ 파싱 완료 - 결과:', parsed)
     return parsed
   }
 
