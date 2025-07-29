@@ -25,6 +25,13 @@ export default function Home() {
   const [autoPlayInterval, setAutoPlayInterval] = useState<NodeJS.Timeout | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(null) // 날짜 선택 상태 추가
   const [availableDates, setAvailableDates] = useState<string[]>([]) // 사용 가능한 날짜 목록
+  const [debugInfo, setDebugInfo] = useState<string>('') // 디버그 정보 추가
+
+  // 디버그 정보 추가
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '환경변수 미설정'
+    setDebugInfo(`현재 API URL: ${apiUrl}`)
+  }, [])
 
   useEffect(() => {
     loadWords()
@@ -384,7 +391,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-      <Header />
+      <Header debugInfo={debugInfo} />
       
       <main className="container mx-auto px-4 py-8">
         {loading ? (
