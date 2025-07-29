@@ -23,6 +23,8 @@ export default function Home() {
   const [adminLoginError, setAdminLoginError] = useState('')
   const [isAutoPlay, setIsAutoPlay] = useState(false)
   const [autoPlayInterval, setAutoPlayInterval] = useState<NodeJS.Timeout | null>(null)
+  const [selectedDate, setSelectedDate] = useState<string | null>(null) // 날짜 선택 상태 추가
+  const [availableDates, setAvailableDates] = useState<string[]>([]) // 사용 가능한 날짜 목록
 
   useEffect(() => {
     loadWords()
@@ -31,16 +33,73 @@ export default function Home() {
 
   // 필터링된 단어 목록 업데이트
   useEffect(() => {
-    if (showFavoritesOnly) {
-      setFilteredWords(words.filter(word => word.is_favorite))
-    } else {
-      setFilteredWords(words)
+    let filtered = words
+    
+    // 날짜 필터 적용
+    if (selectedDate) {
+      filtered = filtered.filter(word => word.study_date === selectedDate)
     }
+    
+    // 즐겨찾기 필터 적용
+    if (showFavoritesOnly) {
+      filtered = filtered.filter(word => word.is_favorite)
+    }
+    
+    setFilteredWords(filtered)
+    
     // 필터 변경 시 첫 번째 단어로 리셋 (단어가 있을 때만)
-    if (words.length > 0) {
+    if (filtered.length > 0) {
       setCurrentWordIndex(0)
     }
-  }, [words, showFavoritesOnly])
+  }, [words, showFavoritesOnly, selectedDate])
+
+  // 사용 가능한 날짜 목록 업데이트
+  useEffect(() => {
+    const dates = [...new Set(words.map(word => word.study_date).filter(Boolean))].sort()
+    setAvailableDates(dates)
+  }, [words])
+
+  // 날짜별 단어 로드 함수
+  const loadWordsByDate = async (date: string | null) => {
+    try {
+      setLoading(true)
+      let response
+      
+      if (date) {
+        // 특정 날짜의 단어만 로드
+        response = await apiClient.getWordsByDate(date)
+      } else {
+        // 모든 단어 로드
+        response = await apiClient.getWords()
+      }
+      
+      if (response.error) {
+        console.error('백엔드 API 오류:', response.error)
+        if (supabase) {
+          let query = supabase.from('words').select('*')
+          if (date) {
+            query = query.eq('study_date', date)
+          }
+          const { data, error } = await query.order('created_at', { ascending: false })
+          
+          if (error) throw error
+          setWords(data || [])
+        }
+      } else {
+        setWords(response.data || [])
+      }
+    } catch (error) {
+      console.error('단어 로드 오류:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 날짜 선택 핸들러
+  const handleDateSelect = (date: string | null) => {
+    setSelectedDate(date)
+    loadWordsByDate(date)
+  }
 
   // 자동재생 기능
   useEffect(() => {
@@ -129,7 +188,8 @@ export default function Home() {
               total_study_time: 300,
               average_accuracy: 0.8,
               last_study_date: '2024-01-15',
-              is_favorite: false
+              is_favorite: false,
+              study_date: '2024-01-15'
             },
             {
               id: 2,
@@ -154,7 +214,8 @@ export default function Home() {
               total_study_time: 180,
               average_accuracy: 0.67,
               last_study_date: '2024-01-14',
-              is_favorite: true
+              is_favorite: true,
+              study_date: '2024-01-14'
             }
           ])
         }
@@ -188,7 +249,8 @@ export default function Home() {
           total_study_time: 300,
           average_accuracy: 0.8,
           last_study_date: '2024-01-15',
-          is_favorite: false
+          is_favorite: false,
+          study_date: '2024-01-15'
         }
       ])
     } finally {
@@ -347,6 +409,45 @@ export default function Home() {
           </div>
         ) : (
           <div className="max-w-4xl mx-auto">
+            {/* 날짜 선택 */}
+            <div className="mb-8">
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+                <h3 className="text-lg font-bold text-white mb-4 flex items-center">
+                  <span className="text-xl mr-2">📅</span>
+                  학습 날짜 선택
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => handleDateSelect(null)}
+                    className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
+                      selectedDate === null
+                        ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg'
+                        : 'bg-white/10 text-gray-300 hover:text-white hover:bg-white/20'
+                    }`}
+                  >
+                    모든 날짜
+                  </button>
+                  {availableDates.map((date) => (
+                    <button
+                      key={date}
+                      onClick={() => handleDateSelect(date)}
+                      className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
+                        selectedDate === date
+                          ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg'
+                          : 'bg-white/10 text-gray-300 hover:text-white hover:bg-white/20'
+                      }`}
+                    >
+                      {new Date(date).toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             {/* 필터 버튼 */}
             <div className="flex justify-center items-center gap-4 mb-8">
               <button

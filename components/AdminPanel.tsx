@@ -27,11 +27,13 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<'input' | 'list' | 'stats' | 'logs'>('input')
   const [stats, setStats] = useState({
     total: 0,
-    categories: {} as Record<string, number>
+    categories: {} as Record<string, number>,
+    dateStats: {} as Record<string, number>
   })
   const [showUserLogs, setShowUserLogs] = useState(false)
   const [userLogs, setUserLogs] = useState<any[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]) // 날짜 선택 상태 추가
 
   useEffect(() => {
     loadWords()
@@ -158,6 +160,7 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
           is_active: true,
           review_count: 0,
           last_reviewed: null,
+          study_date: selectedDate, // 선택된 날짜 추가
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }
@@ -306,9 +309,18 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
       return acc
     }, {} as Record<string, number>)
     
+    // 날짜별 통계 계산
+    const dateStats = words.reduce((acc, word) => {
+      if (word.study_date) {
+        acc[word.study_date] = (acc[word.study_date] || 0) + 1
+      }
+      return acc
+    }, {} as Record<string, number>)
+    
     setStats({
       total: words.length,
-      categories
+      categories,
+      dateStats // 날짜별 통계 추가
     })
   }, [words])
 
@@ -372,6 +384,19 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
                 </h2>
                 
                 <div className="space-y-4">
+                  {/* 날짜 선택 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      학습 날짜 선택
+                    </label>
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="w-full bg-white/5 border border-white/20 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                  
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       입력 형식: 중국어글자 탭 발음 탭 의미 탭 카테고리
@@ -431,7 +456,7 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
                 <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 animate-scale-in">
                   <h3 className="text-xl font-bold text-white mb-4 flex items-center">
                     <span className="text-xl mr-2">👁️</span>
-                    미리보기 ({parsedWords.length}개)
+                    미리보기 ({parsedWords.length}개) - {selectedDate}
                   </h3>
                   <div className="space-y-3 max-h-64 overflow-y-auto">
                     {parsedWords.map((word, index) => (
@@ -484,6 +509,11 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
                           <div className="text-sm text-gray-300">
                             <div>{word.pronunciation}</div>
                             <div className="text-white">{word.meaning}</div>
+                            {word.study_date && (
+                              <div className="text-xs text-blue-300 mt-1">
+                                📅 {word.study_date}
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -548,6 +578,32 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
                   ))}
                 </div>
               </div>
+
+              {/* 날짜별 통계 */}
+              {stats.dateStats && Object.keys(stats.dateStats).length > 0 && (
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+                  <h3 className="text-xl font-bold text-white mb-4 flex items-center">
+                    <span className="text-xl mr-2">📅</span>
+                    날짜별 통계
+                  </h3>
+                  <div className="space-y-3">
+                    {Object.entries(stats.dateStats)
+                      .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
+                      .map(([date, count]) => (
+                        <div key={date} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                          <span className="text-white font-medium">
+                            {new Date(date).toLocaleDateString('ko-KR', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </span>
+                          <span className="text-blue-300 font-bold">{count}개</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

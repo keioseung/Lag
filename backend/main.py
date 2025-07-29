@@ -80,6 +80,18 @@ async def get_words_by_category(category: str, db: Session = Depends(get_db)):
     words = word_crud.get_words_by_category(db, category=category)
     return words
 
+@app.get("/words/date/{study_date}")
+async def get_words_by_date(study_date: str, db: Session = Depends(get_db)):
+    """날짜별 단어 조회"""
+    words = word_crud.get_words_by_date(db, study_date=study_date)
+    return words
+
+@app.get("/words/dates/available")
+async def get_available_dates(db: Session = Depends(get_db)):
+    """사용 가능한 학습 날짜 목록 조회"""
+    dates = word_crud.get_available_dates(db)
+    return {"dates": dates}
+
 # 학습 통계 관련 엔드포인트
 @app.get("/study-stats/", response_model=StudyStatsResponse)
 async def get_study_stats(db: Session = Depends(get_db)):

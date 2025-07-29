@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS words (
     correct_attempts INTEGER DEFAULT 0,
     total_attempts INTEGER DEFAULT 0,
     added_date VARCHAR(10),
+    study_date DATE, -- 날짜별 학습을 위한 필드 추가
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

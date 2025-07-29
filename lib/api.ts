@@ -76,6 +76,15 @@ class ApiClient {
     })
   }
 
+  // 날짜별 단어 조회 API
+  async getWordsByDate(studyDate: string) {
+    return this.request<any[]>(`/words/date/${studyDate}`)
+  }
+
+  async getAvailableDates() {
+    return this.request<{dates: string[]}>('/words/dates/available')
+  }
+
   // 학습 통계 관련 API
   async getStudyStats() {
     return this.request<any>('/study-stats')

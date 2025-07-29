@@ -16,6 +16,7 @@ class Word(Base):
     correct_attempts = Column(Integer, default=0)
     total_attempts = Column(Integer, default=0)
     added_date = Column(Date, default=func.current_date())
+    study_date = Column(Date) # 날짜별 학습을 위한 필드 추가
     difficulty_level = Column(Integer, default=1)
     is_active = Column(Boolean, default=True)
     tags = Column(JSON, default=list)

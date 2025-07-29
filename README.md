@@ -1,236 +1,122 @@
-# LingoMaster - 언어 학습 플랫폼
+# LingoMaster - 중국어 학습 플랫폼
 
-Next.js, FastAPI, Supabase를 사용한 풀스택 언어 학습 애플리케이션입니다.
+중국어 단어 학습을 위한 플래시카드 기반 웹 애플리케이션입니다.
 
-## 🚀 기술 스택
+## 주요 기능
 
-### 프론트엔드
-- **Next.js 14** - React 기반 풀스택 프레임워크
-- **TypeScript** - 타입 안전성
-- **Tailwind CSS** - 스타일링
-- **Lucide React** - 아이콘
-- **Supabase Client** - 데이터베이스 클라이언트
+### 📚 학습 기능
+- **플래시카드 학습**: 중국어 단어를 카드 형태로 학습
+- **날짜별 학습**: 특정 날짜에 등록된 단어들만 선택적으로 학습 가능
+- **즐겨찾기**: 중요한 단어를 즐겨찾기로 관리
+- **자동재생**: 3초마다 자동으로 다음 카드로 넘어가는 기능
+- **키보드 단축키**: 스페이스바(카드 뒤집기), 화살표키(이전/다음)
 
-### 백엔드
-- **FastAPI** - 고성능 Python 웹 프레임워크
-- **SQLAlchemy** - ORM
-- **Pydantic** - 데이터 검증
-- **Uvicorn** - ASGI 서버
+### 🔧 관리자 기능
+- **일괄 단어 입력**: 탭으로 구분된 텍스트를 일괄로 파싱하여 등록
+- **날짜별 단어 관리**: 특정 날짜에 단어를 등록하여 체계적인 학습 계획 수립
+- **단어 목록 관리**: 등록된 단어들의 조회, 수정, 삭제
+- **통계 대시보드**: 카테고리별, 날짜별 단어 통계 확인
+- **사용자 활동 로그**: 학습 활동 기록 확인
 
-### 데이터베이스
-- **Supabase PostgreSQL** - 클라우드 데이터베이스
+### 📊 통계 및 분석
+- **학습 진행률**: 현재 학습 중인 단어의 진행 상황
+- **정답률**: 전체 학습 정답률 표시
+- **연속 학습일**: 매일 학습한 연속 일수
+- **날짜별 통계**: 각 날짜별로 등록된 단어 수 확인
 
-## 📁 프로젝트 구조
+## 기술 스택
 
-```
-lingomaster/
-├── app/                    # Next.js 앱 디렉토리
-│   ├── globals.css        # 전역 스타일
-│   ├── layout.tsx         # 루트 레이아웃
-│   └── page.tsx           # 메인 페이지
-├── components/            # React 컴포넌트
-│   ├── Header.tsx         # 헤더 컴포넌트
-│   ├── AdminPanel.tsx     # 관리자 패널
-│   └── LearningPanel.tsx  # 학습 패널
-├── lib/                   # 유틸리티
-│   ├── supabase.ts        # Supabase 클라이언트
-│   ├── api.ts             # 백엔드 API 클라이언트
-│   └── api-status.ts      # API 상태 확인 유틸리티
-├── backend/               # FastAPI 백엔드
-│   ├── main.py           # FastAPI 앱
-│   ├── database.py       # 데이터베이스 설정
-│   ├── models.py         # SQLAlchemy 모델
-│   ├── schemas.py        # Pydantic 스키마
-│   ├── crud.py           # CRUD 작업
-│   └── requirements.txt  # Python 의존성
-├── package.json          # Node.js 의존성
-├── tailwind.config.js    # Tailwind 설정
-├── tsconfig.json         # TypeScript 설정
-└── README.md            # 프로젝트 문서
-```
+### Frontend
+- **Next.js 14**: React 기반 풀스택 프레임워크
+- **TypeScript**: 타입 안전성 보장
+- **Tailwind CSS**: 모던한 UI 디자인
+- **Supabase**: 실시간 데이터베이스 및 인증
 
-## 🛠️ 설치 및 실행
+### Backend
+- **FastAPI**: Python 기반 고성능 API
+- **SQLAlchemy**: ORM을 통한 데이터베이스 관리
+- **PostgreSQL**: 관계형 데이터베이스
 
-### 1. Supabase 설정
+## 설치 및 실행
 
-1. [Supabase](https://supabase.com)에서 새 프로젝트 생성
-2. SQL Editor에서 다음 테이블 생성:
-
-```sql
--- 단어 테이블
-CREATE TABLE words (
-    id SERIAL PRIMARY KEY,
-    original VARCHAR NOT NULL,
-    pronunciation VARCHAR NOT NULL,
-    meaning VARCHAR NOT NULL,
-    category VARCHAR DEFAULT '기본',
-    priority INTEGER DEFAULT 0,
-    mastery_level FLOAT DEFAULT 0.0,
-    times_studied INTEGER DEFAULT 0,
-    correct_attempts INTEGER DEFAULT 0,
-    total_attempts INTEGER DEFAULT 0,
-    added_date VARCHAR,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 학습 통계 테이블
-CREATE TABLE study_stats (
-    id SERIAL PRIMARY KEY,
-    total_answered INTEGER DEFAULT 0,
-    correct_answers INTEGER DEFAULT 0,
-    studied_words TEXT[] DEFAULT '{}',
-    weak_words TEXT[] DEFAULT '{}',
-    daily_streak INTEGER DEFAULT 0,
-    daily_goal INTEGER DEFAULT 20,
-    daily_progress INTEGER DEFAULT 0,
-    words_per_minute FLOAT DEFAULT 0.0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
-
-### 2. 환경 변수 설정
-
-1. `env.example`을 `.env.local`로 복사하고 다음 정보 입력:
-
+### 1. 저장소 클론
 ```bash
-# Supabase 설정
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
-
-# FastAPI 백엔드 URL (Railway 프로덕션)
-NEXT_PUBLIC_API_URL=https://product2-production.up.railway.app
-
-# 백엔드 데이터베이스 설정
-DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres
+git clone <repository-url>
+cd Lag
 ```
 
-2. `backend/.env.example`을 `backend/.env`로 복사하고 데이터베이스 정보 입력
-
-### 3. 백엔드 연동
-
-프로젝트는 Railway에 배포된 FastAPI 백엔드(`https://product2-production.up.railway.app`)와 연동됩니다.
-
-#### 백엔드 API 엔드포인트
-
-- `GET /words` - 모든 단어 조회
-- `POST /words` - 새 단어 추가
-- `PUT /words/{id}` - 단어 수정
-- `DELETE /words/{id}` - 단어 삭제
-- `GET /study-stats` - 학습 통계 조회
-- `PUT /study-stats` - 학습 통계 업데이트
-- `POST /study-session/start` - 학습 세션 시작
-- `POST /study-session/answer` - 답변 제출
-- `POST /study-session/{session_id}/end` - 학습 세션 종료
-- `GET /health` - API 상태 확인
-
-#### 연동 방식
-
-1. **우선순위**: 백엔드 API → Supabase 직접 연결 → 로컬 데이터
-2. **실시간 상태**: 헤더에 백엔드 연결 상태 표시
-3. **학습 세션**: 백엔드에서 학습 세션 관리 및 통계 추적
-
-### 4. 프론트엔드 실행
-
+### 2. 프론트엔드 설정
 ```bash
-# 의존성 설치
 npm install
-
-# 개발 서버 실행
 npm run dev
 ```
 
-### 4. 백엔드 실행
-
+### 3. 백엔드 설정
 ```bash
-# 백엔드 디렉토리로 이동
 cd backend
-
-# Python 가상환경 생성 (선택사항)
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# 의존성 설치
 pip install -r requirements.txt
-
-# 개발 서버 실행
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+python main.py
 ```
 
-## 🎯 주요 기능
+### 4. 환경 변수 설정
+`.env.local` 파일을 생성하고 다음 내용을 추가:
+```
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_API_URL=your_backend_api_url
+```
 
-### 관리자 모드
-- ✅ 단어 추가/삭제/수정
-- ✅ 카테고리별 필터링
-- ✅ 검색 기능
-- ✅ CSV 내보내기/가져오기
-- ✅ 숙련도 표시
+## 사용법
 
 ### 학습 모드
-- ✅ 플래시카드 학습
-- ✅ 퀴즈 모드
-- ✅ 타이핑 연습
-- ✅ 듣기 연습
-- ✅ 난이도 설정
-- ✅ 학습 통계 추적
-- ✅ 일일 목표 설정
-- ✅ 연속 학습 기록
+1. 메인 페이지에서 날짜를 선택하여 해당 날짜의 단어들을 학습
+2. "모든 날짜" 버튼을 클릭하면 전체 단어를 학습
+3. 즐겨찾기 버튼으로 중요한 단어만 필터링 가능
+4. 카드를 클릭하거나 스페이스바를 눌러 답안 확인
+5. 화살표키로 이전/다음 카드 이동
 
-### 고급 기능
-- ✅ 음성 합성 (TTS)
-- ✅ 실시간 타이머
-- ✅ 진행률 표시
-- ✅ 약점 단어 보강
-- ✅ 단어 섞기
-- ✅ 마스터리 레벨 시스템
+### 관리자 모드
+1. 하단의 "관리자 모드" 버튼 클릭
+2. 비밀번호 입력 (기본값: 123321)
+3. **입력 탭**: 날짜를 선택하고 단어를 일괄 입력
+4. **목록 탭**: 등록된 단어들의 관리
+5. **통계 탭**: 카테고리별, 날짜별 통계 확인
+6. **로그 탭**: 사용자 활동 로그 확인
 
-## 🔧 API 엔드포인트
+### 단어 입력 형식
+```
+중국어글자	발음	의미	카테고리
+你好	nǐ hǎo	안녕하세요	인사말
+谢谢	xiè xie	감사합니다	인사말
+```
 
-### 단어 관리
-- `GET /words/` - 모든 단어 조회
-- `GET /words/{word_id}` - 특정 단어 조회
-- `POST /words/` - 새 단어 생성
-- `PUT /words/{word_id}` - 단어 수정
-- `DELETE /words/{word_id}` - 단어 삭제
-- `GET /words/category/{category}` - 카테고리별 단어 조회
-- `GET /words/weak/` - 약점 단어 조회
+## 데이터베이스 스키마
 
-### 학습 통계
-- `GET /study-stats/` - 학습 통계 조회
-- `POST /study-stats/` - 학습 통계 생성
-- `PUT /study-stats/` - 학습 통계 수정
+### words 테이블
+- `id`: 고유 식별자
+- `original`: 중국어 단어
+- `pronunciation`: 발음
+- `meaning`: 한국어 의미
+- `category`: 카테고리
+- `study_date`: 학습 날짜 (새로 추가)
+- `priority`: 우선순위
+- `mastery_level`: 숙련도 레벨
+- `is_favorite`: 즐겨찾기 여부
 
-### 학습 세션
-- `POST /words/{word_id}/study` - 학습 세션 기록
+## 배포
 
-## 🎨 UI/UX 특징
-
-- **Duolingo 스타일** - 게임화된 학습 경험
-- **반응형 디자인** - 모바일/데스크톱 지원
-- **그라데이션 배경** - 시각적 매력
-- **애니메이션 효과** - 부드러운 전환
-- **직관적 인터페이스** - 사용자 친화적
-
-## 🚀 배포
-
-### Vercel (프론트엔드)
-1. GitHub에 코드 푸시
-2. Vercel에서 프로젝트 연결
+### Railway 배포
+1. Railway 계정 생성
+2. GitHub 저장소 연결
 3. 환경 변수 설정
-4. 자동 배포
+4. 자동 배포 완료
 
-### Railway/Heroku (백엔드)
-1. 백엔드 코드를 별도 저장소에 푸시
-2. Railway/Heroku에서 앱 생성
-3. 환경 변수 설정
-4. 배포
+### Supabase 설정
+1. Supabase 프로젝트 생성
+2. 데이터베이스 스키마 적용 (`database/schema.sql`)
+3. 환경 변수에 Supabase URL과 API 키 추가
 
-## 📝 라이선스
-
-MIT License
-
-## 🤝 기여
+## 기여하기
 
 1. Fork the Project
 2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
@@ -238,6 +124,10 @@ MIT License
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📞 문의
+## 라이선스
 
-프로젝트에 대한 질문이나 제안사항이 있으시면 이슈를 생성해주세요. 
+이 프로젝트는 MIT 라이선스 하에 배포됩니다.
+
+## 연락처
+
+프로젝트 링크: [https://github.com/yourusername/Lag](https://github.com/yourusername/Lag) 

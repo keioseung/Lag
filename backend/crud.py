@@ -39,6 +39,16 @@ class WordCRUD:
     def get_words_by_category(self, db: Session, category: str) -> List[Word]:
         return db.query(Word).filter(Word.category == category).all()
 
+    def get_words_by_date(self, db: Session, study_date: str) -> List[Word]:
+        """특정 날짜의 단어들 조회"""
+        return db.query(Word).filter(Word.study_date == study_date).all()
+
+    def get_available_dates(self, db: Session) -> List[str]:
+        """사용 가능한 학습 날짜 목록 조회"""
+        from sqlalchemy import distinct
+        dates = db.query(distinct(Word.study_date)).filter(Word.study_date.isnot(None)).all()
+        return [date[0] for date in dates if date[0]]
+
     def get_weak_words(self, db: Session) -> List[Word]:
         """정확도 70% 미만인 단어들 조회"""
         return db.query(Word).filter(

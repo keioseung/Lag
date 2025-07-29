@@ -21,6 +21,7 @@ export interface Word {
   correct_attempts: number
   total_attempts: number
   added_date: string
+  study_date: string | null // 날짜별 학습을 위한 필드 추가
   difficulty_level: number
   is_active: boolean
   is_favorite: boolean

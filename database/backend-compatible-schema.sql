@@ -1,5 +1,5 @@
--- 백엔드 모델과 완전히 호환되는 Supabase DB 스키마
--- 이 스크립트를 Supabase SQL Editor에서 실행하세요
+-- LingoMaster 백엔드 호환 데이터베이스 스키마
+-- PostgreSQL에서 실행하세요
 
 -- 기존 테이블이 있다면 삭제 (주의: 데이터가 모두 삭제됩니다)
 DROP TABLE IF EXISTS session_answers CASCADE;
@@ -8,22 +8,23 @@ DROP TABLE IF EXISTS user_profiles CASCADE;
 DROP TABLE IF EXISTS study_stats CASCADE;
 DROP TABLE IF EXISTS words CASCADE;
 
--- 1. words 테이블 (백엔드 Word 모델과 정확히 일치)
+-- 1. 단어 테이블 생성
 CREATE TABLE IF NOT EXISTS words (
     id SERIAL PRIMARY KEY,
-    original VARCHAR(100) NOT NULL,
-    pronunciation VARCHAR(200) NOT NULL,
+    original VARCHAR(255) NOT NULL,
+    pronunciation VARCHAR(255) NOT NULL,
     meaning VARCHAR(500) NOT NULL,
-    category VARCHAR(50) DEFAULT '중국어',
+    category VARCHAR(100) DEFAULT '중국어',
     priority INTEGER DEFAULT 0,
-    mastery_level INTEGER DEFAULT 0,
+    mastery_level FLOAT DEFAULT 0.0,
     times_studied INTEGER DEFAULT 0,
     correct_attempts INTEGER DEFAULT 0,
     total_attempts INTEGER DEFAULT 0,
-    added_date VARCHAR(10) NOT NULL, -- YYYY-MM-DD 형식
+    added_date DATE DEFAULT CURRENT_DATE,
+    study_date DATE, -- 날짜별 학습을 위한 필드 추가
     difficulty_level INTEGER DEFAULT 1,
-    is_active BOOLEAN DEFAULT true,
-    tags JSONB DEFAULT '[]'::jsonb, -- PostgreSQL JSONB 타입
+    is_active BOOLEAN DEFAULT TRUE,
+    tags JSONB DEFAULT '[]',
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
