@@ -72,68 +72,11 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
     const parsed: ParsedWord[] = []
     const seenWords = new Set<string>() // 중복 단어 체크용
     
-    // 헤더 행과 구분선 제거
-    const filteredLines = lines.filter(line => {
-      // 구분선 제거
-      if (line.includes('---')) return false
-      
-      // 헤더 행 제거 (다양한 헤더 패턴)
-      if (line.includes('|') && (
-        line.includes('한자') || 
-        line.includes('중국어') || 
-        line.includes('단어') ||
-        line.includes('한국어') ||
-        line.includes('발음') ||
-        line.includes('의미') ||
-        line.includes('뜻') ||
-        line.includes('표기') ||
-        line.includes('---') ||
-        line.includes('中国어') ||
-        line.includes('단어')
-      )) return false
-      
-      return true
-    })
-    console.log('🔍 필터링된 라인 수:', filteredLines.length)
-    
-    for (const line of filteredLines) {
-      // 파이프(|)로 구분된 테이블 행 처리
+    // 간단한 파싱 로직 - 파이프(|)로 구분된 테이블만 처리
+    for (const line of lines) {
       if (line.includes('|')) {
         const parts = line.split('|').map(part => part.trim()).filter(part => part)
-        
-        if (parts.length >= 3) {
-          // 첫 번째 열이 한자/단어, 두 번째 열이 발음, 세 번째 열이 의미
-          let original = parts[0]
-          let pronunciation = parts[1]
-          let meaning = parts[2]
-          const category = parts[3] || '중국어'
-          
-          // 특수문자 및 불필요한 문자 제거
-          original = original.replace(/["""]/g, '').trim()
-          pronunciation = pronunciation.replace(/["""]/g, '').trim()
-          meaning = meaning.replace(/["""]/g, '').trim()
-          
-          // 의미가 있는 데이터만 추가 (빈 문자열이나 구두점만 있는 경우 제외)
-          if (original && pronunciation && meaning && 
-              original.length > 0 && pronunciation.length > 0 && meaning.length > 0 &&
-              !original.match(/^[^\w\s]*$/) && 
-              !pronunciation.match(/^[^\w\s]*$/) && 
-              !meaning.match(/^[^\w\s]*$/) &&
-              !original.match(/^[0-9\s\-\.]+$/) && // 숫자나 구두점만 있는 경우 제외
-              !pronunciation.match(/^[0-9\s\-\.]+$/) &&
-              !meaning.match(/^[0-9\s\-\.]+$/)) {
-            
-            // 중복 체크
-            const wordKey = `${original}-${pronunciation}`
-            if (!seenWords.has(wordKey)) {
-              seenWords.add(wordKey)
-              parsed.push({ original, pronunciation, meaning, category })
-            }
-          }
-        }
-      } else {
-        // 탭으로 구분된 행 처리
-        const parts = line.split('\t').map(part => part.trim()).filter(part => part)
+        console.log('🔍 파싱 중인 라인:', line, '분리된 부분:', parts)
         
         if (parts.length >= 3) {
           let original = parts[0]
@@ -141,26 +84,21 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
           let meaning = parts[2]
           const category = parts[3] || '중국어'
           
-          // 특수문자 및 불필요한 문자 제거
+          // 특수문자 제거
           original = original.replace(/["""]/g, '').trim()
           pronunciation = pronunciation.replace(/["""]/g, '').trim()
           meaning = meaning.replace(/["""]/g, '').trim()
           
-          // 의미가 있는 데이터만 추가
+          // 기본적인 유효성 검사만
           if (original && pronunciation && meaning && 
-              original.length > 0 && pronunciation.length > 0 && meaning.length > 0 &&
-              !original.match(/^[^\w\s]*$/) && 
-              !pronunciation.match(/^[^\w\s]*$/) && 
-              !meaning.match(/^[^\w\s]*$/) &&
-              !original.match(/^[0-9\s\-\.]+$/) &&
-              !pronunciation.match(/^[0-9\s\-\.]+$/) &&
-              !meaning.match(/^[0-9\s\-\.]+$/)) {
+              original.length > 0 && pronunciation.length > 0 && meaning.length > 0) {
             
             // 중복 체크
             const wordKey = `${original}-${pronunciation}`
             if (!seenWords.has(wordKey)) {
               seenWords.add(wordKey)
               parsed.push({ original, pronunciation, meaning, category })
+              console.log('✅ 파싱된 단어:', { original, pronunciation, meaning, category })
             }
           }
         }
@@ -182,13 +120,24 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
   }
 
   const handleSaveAll = async () => {
-    if (parsedWords.length === 0) return
+    if (!bulkInput.trim()) return
     
     setIsSaving(true)
+    
+    // 먼저 파싱
+    const parsed = parseChineseInput(bulkInput)
+    console.log('🔍 파싱된 단어 수:', parsed.length)
+    
+    if (parsed.length === 0) {
+      alert('파싱할 수 있는 단어가 없습니다. 입력 형식을 확인해주세요.')
+      setIsSaving(false)
+      return
+    }
+    
     let successCount = 0
     let errorCount = 0
     
-    for (const word of parsedWords) {
+    for (const word of parsed) {
       try {
         console.log('저장 중인 단어:', word)
         
@@ -269,6 +218,7 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
       console.log('단어 목록 새로고침 중...')
       await loadWords()
       console.log('단어 목록 새로고침 완료')
+      alert(`✅ ${successCount}개의 단어가 성공적으로 저장되었습니다!`)
     }
 
     // 결과 알림
@@ -461,73 +411,27 @@ export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
                   
                   <div className="flex flex-col sm:flex-row gap-3">
                     <button
-                      onClick={handleParse}
-                      disabled={!bulkInput.trim() || isParsing}
-                      className="touch-feedback flex-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-300 hover:from-purple-600 hover:to-blue-600 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-lg"
+                      onClick={handleSaveAll}
+                      disabled={!bulkInput.trim() || isSaving}
+                      className="touch-feedback flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-300 hover:from-green-600 hover:to-emerald-600 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-lg"
                     >
-                      {isParsing ? (
+                      {isSaving ? (
                         <>
                           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                          파싱 중...
+                          저장 중...
                         </>
                       ) : (
                         <>
-                          <span className="text-lg mr-2">👁️</span>
-                          미리보기
+                          <span className="text-lg mr-2">💾</span>
+                          저장하기
                         </>
                       )}
                     </button>
-                    
-                    {showPreview && (
-                      <button
-                        onClick={handleSaveAll}
-                        disabled={parsedWords.length === 0 || isSaving}
-                        className="touch-feedback flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-300 hover:from-green-600 hover:to-emerald-600 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-lg"
-                      >
-                        {isSaving ? (
-                          <>
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                            저장 중...
-                          </>
-                        ) : (
-                          <>
-                            <span className="text-lg mr-2">💾</span>
-                            모두 저장 ({parsedWords.length}개)
-                          </>
-                        )}
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>
 
-              {/* 미리보기 */}
-              {showPreview && parsedWords.length > 0 && (
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 animate-scale-in">
-                  <h3 className="text-xl font-bold text-white mb-4 flex items-center">
-                    <span className="text-xl mr-2">👁️</span>
-                    미리보기 ({parsedWords.length}개) - {selectedDate}
-                  </h3>
-                  <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {parsedWords.map((word, index) => (
-                      <div key={index} className="bg-white/5 rounded-lg p-4 border border-white/10">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                          <div className="flex items-center space-x-3">
-                            <span className="text-2xl font-bold text-purple-300">{word.original}</span>
-                            <div className="text-sm text-gray-300">
-                              <div>{word.pronunciation}</div>
-                              <div className="text-white">{word.meaning}</div>
-                            </div>
-                          </div>
-                          <span className="px-3 py-1 bg-purple-500/20 text-purple-300 text-xs rounded-full self-start">
-                            {word.category}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+
             </div>
           )}
 
