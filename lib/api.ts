@@ -49,7 +49,7 @@ class ApiClient {
 
   // 단어 관련 API
   async getWords() {
-    return this.request<any[]>('/words')
+    return this.request<any[]>('/words/')
   }
 
   async getWord(id: number) {
@@ -57,7 +57,7 @@ class ApiClient {
   }
 
   async createWord(wordData: any) {
-    return this.request<any>('/words', {
+    return this.request<any>('/words/', {
       method: 'POST',
       body: JSON.stringify(wordData),
     })
@@ -87,11 +87,11 @@ class ApiClient {
 
   // 학습 통계 관련 API
   async getStudyStats() {
-    return this.request<any>('/study-stats')
+    return this.request<any>('/study-stats/')
   }
 
   async updateStudyStats(statsData: any) {
-    return this.request<any>('/study-stats', {
+    return this.request<any>('/study-stats/', {
       method: 'PUT',
       body: JSON.stringify(statsData),
     })
