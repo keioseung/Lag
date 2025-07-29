@@ -97,10 +97,14 @@ export default function DebugPage() {
 
           <div className="card">
             <h2 className="text-xl font-semibold mb-4">API 엔드포인트 테스트</h2>
+            <div className="mb-4 p-4 bg-yellow-50 rounded-lg">
+              <strong>현재 API URL:</strong> {process.env.NEXT_PUBLIC_API_URL || '설정되지 않음'}
+            </div>
             <button
               onClick={async () => {
                 try {
-                  const response = await fetch('https://product2-production.up.railway.app/words/')
+                  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://lag-production-f11f.up.railway.app'
+                  const response = await fetch(`${apiUrl}/words/`)
                   if (response.ok) {
                     const data = await response.json()
                     alert(`단어 목록 조회 성공: ${data.length}개 단어`)
