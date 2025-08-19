@@ -1,41 +1,43 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import { apiClient } from '@/lib/api'
-import type { Word, StudyStats } from '@/lib/supabase'
 import Header from '@/components/Header'
 import FlashcardDisplay from '@/components/FlashcardDisplay'
 import AdminPanel from '@/components/AdminPanel'
 
+// 4개 언어 학습을 위한 새로운 타입 정의
+interface MultiLanguageWord {
+  id: string
+  korean: string
+  english: string
+  japanese: string
+  chinese: string
+  category: string
+  difficulty: 'easy' | 'medium' | 'hard'
+  createdDate: string
+  isFavorite: boolean
+}
+
 export default function Home() {
-  const [words, setWords] = useState<Word[]>([])
-  const [studyStats, setStudyStats] = useState<StudyStats | null>(null)
+  const [words, setWords] = useState<MultiLanguageWord[]>([])
   const [loading, setLoading] = useState(true)
   const [currentWordIndex, setCurrentWordIndex] = useState(0)
   const [showAnswer, setShowAnswer] = useState(false)
   const [isFlipping, setIsFlipping] = useState(false)
   const [isAdminMode, setIsAdminMode] = useState(false)
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
-  const [filteredWords, setFilteredWords] = useState<Word[]>([])
+  const [filteredWords, setFilteredWords] = useState<MultiLanguageWord[]>([])
   const [showAdminLogin, setShowAdminLogin] = useState(false)
   const [adminPassword, setAdminPassword] = useState('')
   const [adminLoginError, setAdminLoginError] = useState('')
   const [isAutoPlay, setIsAutoPlay] = useState(false)
   const [autoPlayInterval, setAutoPlayInterval] = useState<NodeJS.Timeout | null>(null)
-  const [selectedDate, setSelectedDate] = useState<string | null>(null) // 날짜 선택 상태 추가
-  const [availableDates, setAvailableDates] = useState<string[]>([]) // 사용 가능한 날짜 목록
-  const [debugInfo, setDebugInfo] = useState<string>('') // 디버그 정보 추가
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [availableDates, setAvailableDates] = useState<string[]>([])
 
-  // 디버그 정보 추가
+  // 로컬 스토리지에서 단어 데이터 로드
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '환경변수 미설정'
-    setDebugInfo(`현재 API URL: ${apiUrl}`)
-  }, [])
-
-  useEffect(() => {
-    loadWords()
-    loadStudyStats()
+    loadWordsFromLocalStorage()
   }, [])
 
   // 필터링된 단어 목록 업데이트
@@ -44,17 +46,17 @@ export default function Home() {
     
     // 날짜 필터 적용
     if (selectedDate) {
-      filtered = filtered.filter(word => word.study_date === selectedDate)
+      filtered = filtered.filter(word => word.createdDate === selectedDate)
     }
     
     // 즐겨찾기 필터 적용
     if (showFavoritesOnly) {
-      filtered = filtered.filter(word => word.is_favorite)
+      filtered = filtered.filter(word => word.isFavorite)
     }
     
     setFilteredWords(filtered)
     
-    // 필터 변경 시 첫 번째 단어로 리셋 (단어가 있을 때만)
+    // 필터 변경 시 첫 번째 단어로 리셋
     if (filtered.length > 0) {
       setCurrentWordIndex(0)
     }
@@ -62,41 +64,60 @@ export default function Home() {
 
   // 사용 가능한 날짜 목록 업데이트
   useEffect(() => {
-    const dates = [...new Set(words.map(word => word.study_date).filter(Boolean))].sort()
+    const dates = [...new Set(words.map(word => word.createdDate).filter(Boolean))].sort()
     setAvailableDates(dates)
   }, [words])
 
-  // 날짜별 단어 로드 함수
-  const loadWordsByDate = async (date: string | null) => {
+  // 로컬 스토리지에서 단어 로드
+  const loadWordsFromLocalStorage = () => {
     try {
       setLoading(true)
-      let response
-      
-      if (date) {
-        // 특정 날짜의 단어만 로드
-        response = await apiClient.getWordsByDate(date)
-      } else {
-        // 모든 단어 로드
-        response = await apiClient.getWords()
-      }
-      
-      if (response.error) {
-        console.error('백엔드 API 오류:', response.error)
-        if (supabase) {
-          let query = supabase.from('words').select('*')
-          if (date) {
-            query = query.eq('study_date', date)
-          }
-          const { data, error } = await query.order('created_at', { ascending: false })
-          
-          if (error) throw error
-          setWords(data || [])
+      const storedWords = localStorage.getItem('multiLanguageWords')
+      if (storedWords) {
+        const parsedWords = JSON.parse(storedWords)
+        // 하루가 지난 데이터는 제거
+        const today = new Date().toISOString().split('T')[0]
+        const validWords = parsedWords.filter((word: MultiLanguageWord) => 
+          word.createdDate === today
+        )
+        setWords(validWords)
+        
+        // 하루가 지난 데이터는 로컬 스토리지에서도 제거
+        if (validWords.length !== parsedWords.length) {
+          localStorage.setItem('multiLanguageWords', JSON.stringify(validWords))
         }
       } else {
-        setWords(response.data || [])
+        // 샘플 데이터로 시작
+        const sampleWords: MultiLanguageWord[] = [
+          {
+            id: '1',
+            korean: '안녕하세요',
+            english: 'Hello',
+            japanese: 'こんにちは',
+            chinese: '你好',
+            category: '인사말',
+            difficulty: 'easy',
+            createdDate: new Date().toISOString().split('T')[0],
+            isFavorite: false
+          },
+          {
+            id: '2',
+            korean: '감사합니다',
+            english: 'Thank you',
+            japanese: 'ありがとうございます',
+            chinese: '谢谢',
+            category: '인사말',
+            difficulty: 'easy',
+            createdDate: new Date().toISOString().split('T')[0],
+            isFavorite: false
+          }
+        ]
+        setWords(sampleWords)
+        localStorage.setItem('multiLanguageWords', JSON.stringify(sampleWords))
       }
     } catch (error) {
-      console.error('단어 로드 오류:', error)
+      console.error('로컬 스토리지 로드 오류:', error)
+      setWords([])
     } finally {
       setLoading(false)
     }
@@ -105,7 +126,6 @@ export default function Home() {
   // 날짜 선택 핸들러
   const handleDateSelect = (date: string | null) => {
     setSelectedDate(date)
-    loadWordsByDate(date)
   }
 
   // 자동재생 기능
@@ -153,50 +173,40 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleKeyPress)
   }, [isFlipping])
 
-  const loadWords = async () => {
-    try {
-      // 백엔드 API를 통해 단어 데이터 로드
-      const response = await apiClient.getWords()
-      
-      if (response.error) {
-        console.error('백엔드 API 오류:', response.error)
-        // 백엔드 API 실패 시 Supabase 직접 사용 시도
-        if (supabase) {
-          const { data, error } = await supabase
-            .from('words')
-            .select('*')
-            .order('created_at', { ascending: false })
-          
-          if (error) throw error
-          setWords(data || [])
-        } else {
-          // 모든 방법 실패 시 샘플 데이터 사용
-          setWords([
-            {
-              id: 1,
-              original: '你好',
-              pronunciation: 'nǐ hǎo',
-              meaning: '안녕하세요',
-              category: '인사말',
-              priority: 1,
-              mastery_level: 2.0,
-              times_studied: 5,
-              correct_attempts: 4,
-              total_attempts: 5,
-              is_active: true,
-              review_count: 2,
-              last_reviewed: '2024-01-15',
-              added_date: '2024-01-01',
-              created_at: '2024-01-01T00:00:00Z',
-              updated_at: '2024-01-15T00:00:00Z',
-              difficulty_level: 1,
-              tags: ['기초', '인사'],
-              notes: '가장 기본적인 인사말',
-              total_study_time: 300,
-              average_accuracy: 0.8,
-              last_study_date: '2024-01-15',
-              is_favorite: false,
-              study_date: '2024-01-15'
+  // 즐겨찾기 토글
+  const toggleFavorite = (wordId: string) => {
+    const updatedWords = words.map(word => 
+      word.id === wordId ? { ...word, isFavorite: !word.isFavorite } : word
+    )
+    setWords(updatedWords)
+    localStorage.setItem('multiLanguageWords', JSON.stringify(updatedWords))
+  }
+
+  // 카드 뒤집기
+  const flipCard = () => {
+    if (isFlipping) return
+    setIsFlipping(true)
+    setShowAnswer(!showAnswer)
+    setTimeout(() => setIsFlipping(false), 300)
+  }
+
+  // 다음 카드
+  const nextCard = () => {
+    if (filteredWords.length === 0) return
+    setShowAnswer(false)
+    setCurrentWordIndex((prev) => 
+      prev === filteredWords.length - 1 ? 0 : prev + 1
+    )
+  }
+
+  // 이전 카드
+  const prevCard = () => {
+    if (filteredWords.length === 0) return
+    setShowAnswer(false)
+    setCurrentWordIndex((prev) => 
+      prev === 0 ? filteredWords.length - 1 : prev - 1
+    )
+  }
             },
             {
               id: 2,
