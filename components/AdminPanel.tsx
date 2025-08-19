@@ -1,622 +1,471 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import { apiClient } from '@/lib/api'
-import type { Word } from '@/lib/supabase'
 
-interface ParsedWord {
-  original: string
-  pronunciation: string
-  meaning: string
+// 4개 언어 학습을 위한 타입 정의
+interface MultiLanguageWord {
+  id: string
+  korean: string
+  english: string
+  japanese: string
+  chinese: string
   category: string
+  difficulty: 'easy' | 'medium' | 'hard'
+  createdDate: string
+  isFavorite: boolean
 }
 
 interface AdminPanelProps {
-  onBackToLearning?: () => void
+  onBackToLearning: () => void
+  onAddWord: (newWord: Omit<MultiLanguageWord, 'id' | 'createdDate'>) => void
+  words: MultiLanguageWord[]
 }
 
-export default function AdminPanel({ onBackToLearning }: AdminPanelProps) {
-  const [words, setWords] = useState<Word[]>([])
-  const [loading, setLoading] = useState(true)
+export default function AdminPanel({ onBackToLearning, onAddWord, words }: AdminPanelProps) {
+  const [activeTab, setActiveTab] = useState<'add' | 'list' | 'bulk'>('add')
+  const [newWord, setNewWord] = useState({
+    korean: '',
+    english: '',
+    japanese: '',
+    chinese: '',
+    category: '인사말',
+    difficulty: 'easy' as const
+  })
   const [bulkInput, setBulkInput] = useState('')
-  const [parsedWords, setParsedWords] = useState<ParsedWord[]>([])
-  const [isParsing, setIsParsing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
-  const [activeTab, setActiveTab] = useState<'input' | 'list' | 'stats' | 'logs'>('input')
-  const [stats, setStats] = useState({
-    total: 0,
-    categories: {} as Record<string, number>,
-    dateStats: {} as Record<string, number>
-  })
-  const [showUserLogs, setShowUserLogs] = useState(false)
-  const [userLogs, setUserLogs] = useState<any[]>([])
-  const [logsLoading, setLogsLoading] = useState(false)
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]) // 날짜 선택 상태 추가
+  const [parsedWords, setParsedWords] = useState<any[]>([])
 
-  useEffect(() => {
-    loadWords()
-  }, [])
+  const categories = [
+    '인사말', '숫자', '색깔', '음식', '가족', '동물', '기본', '비즈니스', '여행', '취미'
+  ]
 
-  const loadWords = async () => {
+  const difficulties = [
+    { value: 'easy', label: '쉬움', color: 'text-green-600' },
+    { value: 'medium', label: '보통', color: 'text-yellow-600' },
+    { value: 'hard', label: '어려움', color: 'text-red-600' }
+  ]
+
+  const handleInputChange = (field: keyof typeof newWord, value: string) => {
+    setNewWord((prev: typeof newWord) => ({ ...prev, [field]: value }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    
+    // 유효성 검사
+    if (!newWord.korean || !newWord.english || !newWord.japanese || !newWord.chinese) {
+      alert('모든 언어의 단어를 입력해주세요.')
+      return
+    }
+
+    setIsSaving(true)
     try {
-      setLoading(true)
-      const response = await apiClient.getWords()
+      onAddWord(newWord)
       
-      if (response.error) {
-        console.error('백엔드 API 오류:', response.error)
-        if (supabase) {
-          const { data, error } = await supabase
-            .from('words')
-            .select('*')
-            .order('created_at', { ascending: false })
-          
-          if (error) throw error
-          setWords(data || [])
-        }
-      } else {
-        setWords(response.data || [])
-      }
+      // 폼 초기화
+      setNewWord({
+        korean: '',
+        english: '',
+        japanese: '',
+        chinese: '',
+        category: '인사말',
+        difficulty: 'easy'
+      })
+      
+      alert('단어가 성공적으로 추가되었습니다!')
     } catch (error) {
-      console.error('단어 로드 오류:', error)
+      console.error('단어 추가 오류:', error)
+      alert('단어 추가 중 오류가 발생했습니다.')
     } finally {
-      setLoading(false)
+      setIsSaving(false)
     }
   }
 
-  const parseChineseInput = (input: string): ParsedWord[] => {
-    console.log('🔍 파싱 시작 - 입력 텍스트:', input)
+  const parseBulkInput = (input: string) => {
     const lines = input.trim().split('\n').filter(line => line.trim())
-    console.log('📝 분리된 라인 수:', lines.length)
-    const parsed: ParsedWord[] = []
-    const seenWords = new Set<string>() // 중복 단어 체크용
+    const parsed: any[] = []
     
-    // 간단한 파싱 로직 - 파이프(|)로 구분된 테이블만 처리
     for (const line of lines) {
       if (line.includes('|')) {
         const parts = line.split('|').map(part => part.trim()).filter(part => part)
-        console.log('🔍 파싱 중인 라인:', line, '분리된 부분:', parts)
         
-        if (parts.length >= 3) {
-          let original = parts[0]
-          let pronunciation = parts[1]
-          let meaning = parts[2]
-          const category = parts[3] || '중국어'
-          
-          // 특수문자 제거
-          original = original.replace(/["""]/g, '').trim()
-          pronunciation = pronunciation.replace(/["""]/g, '').trim()
-          meaning = meaning.replace(/["""]/g, '').trim()
-          
-          // 기본적인 유효성 검사만
-          if (original && pronunciation && meaning && 
-              original.length > 0 && pronunciation.length > 0 && meaning.length > 0) {
-            
-            // 중복 체크
-            const wordKey = `${original}-${pronunciation}`
-            if (!seenWords.has(wordKey)) {
-              seenWords.add(wordKey)
-              parsed.push({ original, pronunciation, meaning, category })
-              console.log('✅ 파싱된 단어:', { original, pronunciation, meaning, category })
-            }
-          }
+        if (parts.length >= 4) {
+          parsed.push({
+            korean: parts[0],
+            english: parts[1],
+            japanese: parts[2],
+            chinese: parts[3],
+            category: parts[4] || '기본',
+            difficulty: parts[5] || 'easy'
+          })
         }
       }
     }
     
-    console.log('✅ 파싱 완료 - 결과:', parsed)
-    return parsed
+    setParsedWords(parsed)
+    setShowPreview(true)
   }
 
-  const handleParse = () => {
-    setIsParsing(true)
-    setTimeout(() => {
-      const parsed = parseChineseInput(bulkInput)
-      setParsedWords(parsed)
-      setShowPreview(true)
-      setIsParsing(false)
-    }, 500)
-  }
-
-  const handleSaveAll = async () => {
-    if (!bulkInput.trim()) return
-    
-    setIsSaving(true)
-    
-    // 먼저 파싱
-    const parsed = parseChineseInput(bulkInput)
-    console.log('🔍 파싱된 단어 수:', parsed.length)
-    
-    if (parsed.length === 0) {
-      alert('파싱할 수 있는 단어가 없습니다. 입력 형식을 확인해주세요.')
-      setIsSaving(false)
+  const handleBulkAdd = () => {
+    if (parsedWords.length === 0) {
+      alert('파싱된 단어가 없습니다.')
       return
     }
-    
-    let successCount = 0
-    let errorCount = 0
-    
-    for (const word of parsed) {
-      try {
-        console.log('저장 중인 단어:', word)
-        
-        const wordData = {
-          original: word.original,
-          pronunciation: word.pronunciation,
-          meaning: word.meaning,
-          category: word.category,
-          priority: 0,
-          mastery_level: 0,
-          is_active: true,
-          review_count: 0,
-          last_reviewed: null,
-          study_date: selectedDate, // 선택된 날짜 추가
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-        
-        console.log('전송할 데이터:', wordData)
-        
-        // Supabase에 직접 저장 시도
-        if (supabase) {
-          try {
-            console.log('Supabase 저장 시도 중...')
-            const { data, error } = await supabase
-              .from('words')
-              .insert([wordData])
-              .select()
-            
-            if (error) {
-              console.log('Supabase 저장 오류:', error)
-              console.log('Supabase 저장 실패, 백엔드 API 시도:', error)
-              
-              // 백엔드 API로 재시도
-              console.log('백엔드 API 저장 시도 중...')
-              const apiResult = await apiClient.createWord(wordData)
-              if (apiResult.error) {
-                console.log('백엔드 API 오류:', apiResult.error)
-                throw new Error(`저장 실패: ${apiResult.error}`)
-              }
-            } else {
-              console.log('Supabase 저장 성공:', data[0])
-              successCount++
-              continue // 성공하면 다음 단어로
-            }
-          } catch (supabaseError) {
-            console.error('Supabase 저장 실패, 백엔드 API 시도:', supabaseError)
-          }
-        } else {
-          console.log('Supabase 클라이언트가 없습니다. 백엔드 API만 사용합니다.')
-        }
 
-        // Supabase 실패 시 백엔드 API 시도
-        console.log('백엔드 API 저장 시도 중...')
-        const response = await apiClient.createWord(wordData)
-        
-        if (response.error) {
-          console.error('백엔드 API 오류:', response.error)
-          errorCount++
-        } else {
-          console.log('백엔드 API 저장 성공:', response.data)
-          successCount++
-        }
-      } catch (error) {
-        console.error('단어 저장 오류:', error)
-        errorCount++
-      }
-    }
-
-    setIsSaving(false)
-    
-    console.log(`저장 완료 - 성공: ${successCount}, 실패: ${errorCount}`)
-    
-    if (successCount > 0) {
+    setIsSaving(true)
+    try {
+      parsedWords.forEach((word: any) => {
+        onAddWord(word)
+      })
+      
       setBulkInput('')
       setParsedWords([])
       setShowPreview(false)
-      console.log('단어 목록 새로고침 중...')
-      await loadWords()
-      console.log('단어 목록 새로고침 완료')
-      alert(`✅ ${successCount}개의 단어가 성공적으로 저장되었습니다!`)
-    }
-
-    // 결과 알림
-    const message = `저장 완료: ${successCount}개 성공${errorCount > 0 ? `, ${errorCount}개 실패` : ''}`
-    showNotification(message, successCount > 0 ? 'success' : 'error')
-  }
-
-  const showNotification = (message: string, type: 'success' | 'error') => {
-    const notification = document.createElement('div')
-    notification.className = `fixed top-4 left-4 right-4 z-50 px-6 py-4 rounded-2xl text-white font-semibold shadow-2xl transform transition-all duration-500 ${
-      type === 'success' ? 'bg-gradient-to-r from-green-500 to-emerald-500' : 'bg-gradient-to-r from-red-500 to-pink-500'
-    }`
-    notification.textContent = message
-    
-    document.body.appendChild(notification)
-    
-    setTimeout(() => {
-      notification.style.transform = 'translateY(-100%)'
-      setTimeout(() => document.body.removeChild(notification), 500)
-    }, 3000)
-  }
-
-  const deleteWord = async (id: number) => {
-    try {
-      const response = await apiClient.deleteWord(id)
-      
-      if (response.error) {
-        console.error('백엔드 API 오류:', response.error)
-        if (supabase) {
-          const { error } = await supabase
-            .from('words')
-            .delete()
-            .eq('id', id)
-          
-          if (error) throw error
-        }
-      }
-      
-      setWords(prev => prev.filter(word => word.id !== id))
-      showNotification('단어가 삭제되었습니다', 'success')
+      alert(`${parsedWords.length}개의 단어가 성공적으로 추가되었습니다!`)
     } catch (error) {
-      console.error('단어 삭제 오류:', error)
-      showNotification('삭제 중 오류가 발생했습니다', 'error')
-    }
-  }
-
-  const loadUserLogs = async () => {
-    try {
-      setLogsLoading(true)
-      
-      // 백엔드 API를 통해 사용자 로그 로드
-      const response = await apiClient.getUserLogs()
-      
-      if (response.error) {
-        console.error('백엔드 API 오류:', response.error)
-        if (supabase) {
-          const { data, error } = await supabase
-            .from('user_logs')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(50)
-          
-          if (error) throw error
-          setUserLogs(data || [])
-        }
-      } else {
-        setUserLogs(response.data || [])
-      }
-    } catch (error) {
-      console.error('사용자 로그 로드 오류:', error)
+      console.error('일괄 추가 오류:', error)
+      alert('일괄 추가 중 오류가 발생했습니다.')
     } finally {
-      setLogsLoading(false)
+      setIsSaving(false)
     }
   }
 
-  // 통계 계산
-  useEffect(() => {
-    const categories = words.reduce((acc, word) => {
-      acc[word.category] = (acc[word.category] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-    
-    // 날짜별 통계 계산
-    const dateStats = words.reduce((acc, word) => {
-      if (word.study_date) {
-        acc[word.study_date] = (acc[word.study_date] || 0) + 1
-      }
-      return acc
-    }, {} as Record<string, number>)
-    
-    setStats({
-      total: words.length,
-      categories,
-      dateStats // 날짜별 통계 추가
-    })
-  }, [words])
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'easy': return 'text-green-600 bg-green-100'
+      case 'medium': return 'text-yellow-600 bg-yellow-100'
+      case 'hard': return 'text-red-600 bg-red-100'
+      default: return 'text-gray-600 bg-gray-100'
+    }
+  }
+
+  const getDifficultyLabel = (difficulty: string) => {
+    switch (difficulty) {
+      case 'easy': return '쉬움'
+      case 'medium': return '보통'
+      case 'hard': return '어려움'
+      default: return '알 수 없음'
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
-      <div className="max-w-4xl mx-auto">
-        {/* 헤더 */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            📚 관리자 패널
-          </h1>
-          <p className="text-gray-300 text-base md:text-lg mb-6">중국어 단어 관리 및 일괄 입력</p>
-          
-          {onBackToLearning && (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* 헤더 */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-6">
+            <h1 className="text-3xl font-bold text-gray-900">📚 4개 언어 학습 관리자</h1>
             <button
               onClick={onBackToLearning}
-              className="group relative bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:from-purple-600 hover:to-blue-600 hover:scale-105 flex items-center mx-auto shadow-lg"
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
             >
-              <svg className="w-5 h-5 mr-2 transition-transform group-hover:-translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              학습 모드로 돌아가기
+              <span>←</span>
+              <span>학습 모드로 돌아가기</span>
             </button>
-          )}
-        </div>
-
-        {/* 모바일 탭 네비게이션 */}
-        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-2 mb-6 border border-white/20 mobile-tab-nav">
-          <div className="grid grid-cols-4 gap-2">
-            {[
-              { id: 'input', label: '입력', icon: '📝' },
-              { id: 'list', label: '목록', icon: '📚' },
-              { id: 'stats', label: '통계', icon: '📊' },
-              { id: 'logs', label: '로그', icon: '📋' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`touch-feedback flex flex-col items-center py-3 px-2 rounded-xl transition-all duration-300 ${
-                  activeTab === tab.id
-                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg animate-bounce-in'
-                    : 'text-gray-300 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <span className="text-lg mb-1">{tab.icon}</span>
-                <span className="text-xs font-medium">{tab.label}</span>
-              </button>
-            ))}
           </div>
         </div>
+      </div>
 
-        {/* 탭 컨텐츠 */}
-        <div className="space-y-6">
-          {/* 입력 탭 */}
-          {activeTab === 'input' && (
-            <div className="space-y-6">
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-                <h2 className="text-xl md:text-2xl font-bold text-white mb-6 flex items-center">
-                  <span className="text-2xl mr-3">📝</span>
-                  일괄 단어 입력
-                </h2>
-                
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* 탭 네비게이션 */}
+        <div className="flex space-x-1 bg-white p-1 rounded-lg shadow-sm mb-8">
+          <button
+            onClick={() => setActiveTab('add')}
+            className={`flex-1 py-3 px-4 rounded-md font-medium transition-colors ${
+              activeTab === 'add'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            }`}
+          >
+            ✏️ 개별 추가
+          </button>
+          <button
+            onClick={() => setActiveTab('bulk')}
+            className={`flex-1 py-3 px-4 rounded-md font-medium transition-colors ${
+              activeTab === 'bulk'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            }`}
+          >
+            📝 일괄 추가
+          </button>
+          <button
+            onClick={() => setActiveTab('list')}
+            className={`flex-1 py-3 px-4 rounded-md font-medium transition-colors ${
+              activeTab === 'list'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            }`}
+          >
+            📋 단어 목록 ({words.length})
+          </button>
+        </div>
+
+        {/* 개별 추가 탭 */}
+        {activeTab === 'add' && (
+          <div className="bg-white rounded-xl shadow-sm border p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">새로운 단어 추가</h2>
+            
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* 4개 언어 입력 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  {/* 날짜 선택 */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      학습 날짜 선택
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      🇰🇷 한국어
                     </label>
                     <input
-                      type="date"
-                      value={selectedDate}
-                      onChange={(e) => setSelectedDate(e.target.value)}
-                      className="w-full bg-white/5 border border-white/20 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      type="text"
+                      value={newWord.korean}
+                      onChange={(e) => handleInputChange('korean', e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="안녕하세요"
+                      required
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      입력 형식: 중국어글자 탭 발음 탭 의미 탭 카테고리 (또는 테이블 형식)
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      🇺🇸 English
                     </label>
-                    <textarea
-                      value={bulkInput}
-                      onChange={(e) => setBulkInput(e.target.value)}
-                      placeholder={`# 탭으로 구분된 형식:
-你好\tnǐ hǎo\t안녕하세요\t인사말
-谢谢\txiè xie\t감사합니다\t인사말
-
-# 또는 테이블 형식:
-| 중국어 단어 | 한국어 발음 | 의미 |
-| --- | --- | --- |
-| 在 | 짜이 | ~에 있다, ~에서 |
-| 一个 | 이거 | 하나의 |`}
-                      className="w-full h-48 md:h-64 bg-white/5 border border-white/20 rounded-xl p-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-sm md:text-base"
+                    <input
+                      type="text"
+                      value={newWord.english}
+                      onChange={(e) => handleInputChange('english', e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Hello"
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      🇯🇵 日本語
+                    </label>
+                    <input
+                      type="text"
+                      value={newWord.japanese}
+                      onChange={(e) => handleInputChange('japanese', e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="こんにちは"
+                      required
                     />
                   </div>
                   
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <button
-                      onClick={handleSaveAll}
-                      disabled={!bulkInput.trim() || isSaving}
-                      className="touch-feedback flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-300 hover:from-green-600 hover:to-emerald-600 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-lg"
-                    >
-                      {isSaving ? (
-                        <>
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                          저장 중...
-                        </>
-                      ) : (
-                        <>
-                          <span className="text-lg mr-2">💾</span>
-                          저장하기
-                        </>
-                      )}
-                    </button>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      🇨🇳 中文
+                    </label>
+                    <input
+                      type="text"
+                      value={newWord.chinese}
+                      onChange={(e) => handleInputChange('chinese', e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="你好"
+                      required
+                    />
                   </div>
                 </div>
               </div>
 
-
-            </div>
-          )}
-
-          {/* 목록 탭 */}
-          {activeTab === 'list' && (
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-              <h2 className="text-xl md:text-2xl font-bold text-white mb-6 flex items-center">
-                <span className="text-2xl mr-3">📚</span>
-                단어 목록 ({words.length}개)
-              </h2>
-              
-              {loading ? (
-                <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-                  <p className="text-gray-300">단어를 불러오는 중...</p>
+              {/* 카테고리와 난이도 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    📂 카테고리
+                  </label>
+                  <select
+                    value={newWord.category}
+                    onChange={(e) => handleInputChange('category', e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    {categories.map(category => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
                 </div>
-              ) : words.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="text-6xl mb-4">📚</div>
-                  <p className="text-gray-300">등록된 단어가 없습니다</p>
-                </div>
-              ) : (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {words.map((word) => (
-                    <div key={word.id} className="bg-white/5 rounded-lg p-4 border border-white/10 hover:bg-white/10 transition-all duration-300 group">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div className="flex items-center space-x-4">
-                          <span className="text-2xl font-bold text-purple-300">{word.original}</span>
-                          <div className="text-sm text-gray-300">
-                            <div>{word.pronunciation}</div>
-                            <div className="text-white">{word.meaning}</div>
-                            {word.study_date && (
-                              <div className="text-xs text-blue-300 mt-1">
-                                📅 {word.study_date}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="px-3 py-1 bg-blue-500/20 text-blue-300 text-xs rounded-full">
-                            {word.category}
-                          </span>
-                          <button
-                            onClick={() => deleteWord(word.id)}
-                            className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all duration-300"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 통계 탭 */}
-          {activeTab === 'stats' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 text-center text-white border border-white/20 hover:bg-white/15 transition-all duration-300">
-                  <div className="text-3xl font-bold text-purple-300 mb-2">{stats.total}</div>
-                  <div className="text-sm text-gray-300">총 단어 수</div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 text-center text-white border border-white/20 hover:bg-white/15 transition-all duration-300">
-                  <div className="text-3xl font-bold text-blue-300 mb-2">{Object.keys(stats.categories).length}</div>
-                  <div className="text-sm text-gray-300">카테고리 수</div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 text-center text-white border border-white/20 hover:bg-white/15 transition-all duration-300">
-                  <div className="text-3xl font-bold text-green-300 mb-2">
-                    {stats.total > 0 ? Math.round((words.filter(w => w.is_active).length / stats.total) * 100) : 0}%
-                  </div>
-                  <div className="text-sm text-gray-300">활성 단어</div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 text-center text-white border border-white/20 hover:bg-white/15 transition-all duration-300">
-                  <div className="text-3xl font-bold text-yellow-300 mb-2">
-                    {Math.round(words.reduce((sum, w) => sum + w.mastery_level, 0) / Math.max(stats.total, 1))}
-                  </div>
-                  <div className="text-sm text-gray-300">평균 숙련도</div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    ⭐ 난이도
+                  </label>
+                  <select
+                    value={newWord.difficulty}
+                    onChange={(e) => handleInputChange('difficulty', e.target.value as any)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    {difficulties.map(diff => (
+                      <option key={diff.value} value={diff.value}>{diff.label}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              {/* 카테고리별 통계 */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-                <h3 className="text-xl font-bold text-white mb-4 flex items-center">
-                  <span className="text-xl mr-2">📊</span>
-                  카테고리별 통계
-                </h3>
-                <div className="space-y-3">
-                  {Object.entries(stats.categories).map(([category, count]) => (
-                    <div key={category} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                      <span className="text-white font-medium">{category}</span>
-                      <span className="text-purple-300 font-bold">{count}개</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 날짜별 통계 */}
-              {stats.dateStats && Object.keys(stats.dateStats).length > 0 && (
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-                  <h3 className="text-xl font-bold text-white mb-4 flex items-center">
-                    <span className="text-xl mr-2">📅</span>
-                    날짜별 통계
-                  </h3>
-                  <div className="space-y-3">
-                    {Object.entries(stats.dateStats)
-                      .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
-                      .map(([date, count]) => (
-                        <div key={date} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                          <span className="text-white font-medium">
-                            {new Date(date).toLocaleDateString('ko-KR', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
-                          </span>
-                          <span className="text-blue-300 font-bold">{count}개</span>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 로그 탭 */}
-          {activeTab === 'logs' && (
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-white flex items-center">
-                  <span className="text-xl mr-2">📋</span>
-                  사용자 활동 로그
-                </h3>
+              {/* 제출 버튼 */}
+              <div className="flex justify-end">
                 <button
-                  onClick={() => {
-                    setShowUserLogs(!showUserLogs)
-                    if (!showUserLogs) loadUserLogs()
-                  }}
-                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl font-semibold transition-all duration-300 hover:from-blue-600 hover:to-purple-600 hover:scale-105 shadow-lg"
+                  type="submit"
+                  disabled={isSaving}
+                  className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
-                  {showUserLogs ? '숨기기' : '보기'}
+                  {isSaving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <span>저장 중...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>💾</span>
+                      <span>단어 저장</span>
+                    </>
+                  )}
                 </button>
               </div>
-              
-              {showUserLogs && (
-                <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {logsLoading ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-                      <p className="text-gray-300 text-sm">로그를 불러오는 중...</p>
-                    </div>
-                  ) : userLogs.length === 0 ? (
-                    <div className="text-center py-8">
-                      <div className="text-4xl mb-2">📊</div>
-                      <p className="text-gray-300 text-sm">사용자 활동 로그가 없습니다</p>
-                    </div>
-                  ) : (
-                    userLogs.map((log, index) => (
-                      <div key={index} className="bg-white/5 rounded-lg p-3 border border-white/10">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                          <div className="flex items-center space-x-3">
-                            <span className="text-sm text-gray-300">{log.action || '활동'}</span>
-                            <span className="text-xs text-gray-400">{log.user_id || '익명'}</span>
-                          </div>
-                          <span className="text-xs text-gray-400">
-                            {new Date(log.created_at).toLocaleString()}
-                          </span>
-                        </div>
-                        {log.details && (
-                          <div className="mt-2 text-xs text-gray-300">
-                            {log.details}
-                          </div>
-                        )}
+            </form>
+          </div>
+        )}
+
+        {/* 일괄 추가 탭 */}
+        {activeTab === 'bulk' && (
+          <div className="bg-white rounded-xl shadow-sm border p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">일괄 단어 추가</h2>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  📝 일괄 입력 (파이프 | 로 구분)
+                </label>
+                <textarea
+                  value={bulkInput}
+                  onChange={(e) => setBulkInput(e.target.value)}
+                  className="w-full h-48 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                  placeholder={`한국어|English|日本語|中文|카테고리|난이도
+
+예시:
+안녕하세요|Hello|こんにちは|你好|인사말|easy
+감사합니다|Thank you|ありがとうございます|谢谢|인사말|easy`}
+                />
+              </div>
+
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => parseBulkInput(bulkInput)}
+                  className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  🔍 파싱하기
+                </button>
+                
+                {showPreview && parsedWords.length > 0 && (
+                  <button
+                    onClick={handleBulkAdd}
+                    disabled={isSaving}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    {isSaving ? '저장 중...' : `💾 ${parsedWords.length}개 단어 저장`}
+                  </button>
+                )}
+              </div>
+
+              {/* 미리보기 */}
+              {showPreview && parsedWords.length > 0 && (
+                <div className="border rounded-lg p-4 bg-gray-50">
+                  <h3 className="font-medium text-gray-900 mb-3">파싱된 단어 미리보기:</h3>
+                  <div className="space-y-2">
+                    {parsedWords.map((word, index) => (
+                      <div key={index} className="flex items-center space-x-4 text-sm">
+                        <span className="w-20 text-gray-600">🇰🇷 {word.korean}</span>
+                        <span className="w-20 text-gray-600">🇺🇸 {word.english}</span>
+                        <span className="w-20 text-gray-600">🇯🇵 {word.japanese}</span>
+                        <span className="w-20 text-gray-600">🇨🇳 {word.chinese}</span>
+                        <span className="w-16 text-gray-600">{word.category}</span>
+                        <span className={`px-2 py-1 rounded text-xs ${getDifficultyColor(word.difficulty)}`}>
+                          {getDifficultyLabel(word.difficulty)}
+                        </span>
                       </div>
-                    ))
-                  )}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* 단어 목록 탭 */}
+        {activeTab === 'list' && (
+          <div className="bg-white rounded-xl shadow-sm border p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">등록된 단어 목록</h2>
+            
+            {words.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">📚</div>
+                <p className="text-gray-500 text-lg">등록된 단어가 없습니다.</p>
+                <p className="text-gray-400">개별 추가 또는 일괄 추가 탭에서 단어를 등록해주세요.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        🇰🇷 한국어
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        🇺🇸 English
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        🇯🇵 日本語
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        🇨🇳 中文
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        📂 카테고리
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        ⭐ 난이도
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        📅 등록일
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {words.map((word) => (
+                      <tr key={word.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {word.korean}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {word.english}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {word.japanese}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {word.chinese}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {word.category}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs rounded-full ${getDifficultyColor(word.difficulty)}`}>
+                            {getDifficultyLabel(word.difficulty)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(word.createdDate).toLocaleDateString('ko-KR')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
