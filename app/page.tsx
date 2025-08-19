@@ -249,22 +249,9 @@ export default function Home() {
     return <AdminPanel onBackToLearning={handleAdminLogout} onAddWord={addWord} words={words} />
   }
 
-  const handleBackToLearning = () => {
-    setIsAdminMode(false)
-    setShowAdminLogin(false)
-    setAdminPassword('')
-    setAdminLoginError('')
-  }
-
-  const currentWord = filteredWords[currentWordIndex] || null
-
-  if (isAdminMode) {
-    return <AdminPanel onBackToLearning={handleBackToLearning} />
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-      <Header debugInfo={debugInfo} />
+      <Header />
       
       <main className="container mx-auto px-4 py-8">
         {loading ? (
@@ -445,25 +432,7 @@ export default function Home() {
               </button>
             </div>
 
-            {/* 학습 통계 */}
-            {studyStats && (
-              <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 text-center text-white">
-                  <div className="text-3xl font-bold text-purple-300 mb-2">{studyStats.daily_streak}</div>
-                  <div className="text-sm text-gray-300">연속 학습일</div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 text-center text-white">
-                  <div className="text-3xl font-bold text-blue-300 mb-2">{studyStats.total_answered}</div>
-                  <div className="text-sm text-gray-300">총 학습 단어</div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 text-center text-white">
-                  <div className="text-3xl font-bold text-green-300 mb-2">
-                    {studyStats.total_answered > 0 ? Math.round((studyStats.correct_answers / studyStats.total_answered) * 100) : 0}%
-                  </div>
-                  <div className="text-sm text-gray-300">정답률</div>
-                </div>
-              </div>
-            )}
+
 
             {/* 관리자 로그인 모달 */}
             {showAdminLogin && (
