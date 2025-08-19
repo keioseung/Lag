@@ -1,17 +1,32 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { Word } from '@/lib/supabase'
+// 4개 언어 학습을 위한 타입 정의
+interface MultiLanguageWord {
+  id: string
+  korean: string
+  english: string
+  japanese: string
+  chinese: string
+  category: string
+  difficulty: 'easy' | 'medium' | 'hard'
+  createdDate: string
+  isFavorite: boolean
+}
 
 interface FlashcardDisplayProps {
-  word: Word
+  word: MultiLanguageWord
   showAnswer: boolean
   isFlipping: boolean
   onFlip: () => void
-  onToggleFavorite?: (wordId: number) => void
+  onNext?: () => void
+  onPrev?: () => void
+  onToggleFavorite?: (wordId: string) => void
+  currentIndex?: number
+  totalCount?: number
 }
 
-export default function FlashcardDisplay({ word, showAnswer, isFlipping, onFlip, onToggleFavorite }: FlashcardDisplayProps) {
+export default function FlashcardDisplay({ word, showAnswer, isFlipping, onFlip, onNext, onPrev, onToggleFavorite, currentIndex, totalCount }: FlashcardDisplayProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [isPressed, setIsPressed] = useState(false)
 
@@ -127,34 +142,49 @@ export default function FlashcardDisplay({ word, showAnswer, isFlipping, onFlip,
           {/* 카드 내용 */}
           <div className="text-center relative z-10">
             {!showAnswer ? (
-              // 앞면: 중국어 글자
-              <div className="space-y-8">
+              // 앞면: 4개 언어 모두 표시
+              <div className="space-y-6">
+                {/* 한국어 */}
                 <div className="group">
+                  <div className="text-sm text-gray-500 mb-2">🇰🇷 한국어</div>
                   <div 
-                    className="text-8xl font-bold text-gray-800 mb-4 transition-all duration-300 group-hover:scale-110 cursor-pointer"
-                    onClick={() => speakWord(word.original)}
+                    className="text-4xl font-bold text-gray-800 mb-4 transition-all duration-300 group-hover:scale-110 cursor-pointer"
+                    onClick={() => speakWord(word.korean, 'ko-KR')}
                   >
-                    {word.original}
-                  </div>
-                  <div className="text-sm text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    클릭하여 발음 듣기
+                    {word.korean}
                   </div>
                 </div>
-                
-                <div className="space-y-4">
-                  <div className="text-2xl font-medium text-gray-600">
-                    {word.pronunciation}
+
+                {/* 영어 */}
+                <div className="group">
+                  <div className="text-sm text-gray-500 mb-2">🇺🇸 English</div>
+                  <div 
+                    className="text-3xl font-medium text-gray-700 mb-4 transition-all duration-300 group-hover:scale-110 cursor-pointer"
+                    onClick={() => speakWord(word.english, 'en-US')}
+                  >
+                    {word.english}
                   </div>
-                  
-                  <div className="flex justify-center space-x-2">
-                    {word.tags?.map((tag, index) => (
-                      <span
-                        key={index}
-                        className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full"
-                      >
-                        {tag}
-                      </span>
-                    ))}
+                </div>
+
+                {/* 일본어 */}
+                <div className="group">
+                  <div className="text-sm text-gray-500 mb-2">🇯🇵 日本語</div>
+                  <div 
+                    className="text-3xl font-medium text-gray-700 mb-4 transition-all duration-300 group-hover:scale-110 cursor-pointer"
+                    onClick={() => speakWord(word.japanese, 'ja-JP')}
+                  >
+                    {word.japanese}
+                  </div>
+                </div>
+
+                {/* 중국어 */}
+                <div className="group">
+                  <div className="text-sm text-gray-500 mb-2">🇨🇳 中文</div>
+                  <div 
+                    className="text-3xl font-medium text-gray-700 mb-4 transition-all duration-300 group-hover:scale-110 cursor-pointer"
+                    onClick={() => speakWord(word.chinese, 'zh-CN')}
+                  >
+                    {word.chinese}
                   </div>
                 </div>
 
@@ -170,30 +200,37 @@ export default function FlashcardDisplay({ word, showAnswer, isFlipping, onFlip,
                 </div>
               </div>
             ) : (
-              // 뒷면: 한국어 의미
-              <div className="space-y-8">
-                <div className="text-6xl font-bold text-gray-800 mb-6">
-                  {word.meaning}
+              // 뒷면: 4개 언어 비교 및 상세 정보
+              <div className="space-y-6">
+                <div className="text-2xl font-bold text-gray-800 mb-6">
+                  4개 언어 비교
                 </div>
                 
-                <div className="space-y-4">
-                  <div className="text-xl text-gray-600">
-                    {word.original} - {word.pronunciation}
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-2">
+                    <div className="font-medium text-gray-700">🇰🇷 한국어</div>
+                    <div className="text-gray-600">{word.korean}</div>
                   </div>
-                  
-                  <div className="flex justify-center space-x-4 text-sm text-gray-500">
-                    <span>학습 횟수: {word.times_studied}</span>
-                    <span>정답률: {word.total_attempts > 0 ? Math.round((word.correct_attempts / word.total_attempts) * 100) : 0}%</span>
+                  <div className="space-y-2">
+                    <div className="font-medium text-gray-700">🇺🇸 English</div>
+                    <div className="text-gray-600">{word.english}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="font-medium text-gray-700">🇯🇵 日本語</div>
+                    <div className="text-gray-600">{word.japanese}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="font-medium text-gray-700">🇨🇳 中文</div>
+                    <div className="text-gray-600">{word.chinese}</div>
                   </div>
                 </div>
 
-                {word.notes && (
-                  <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                    <div className="text-sm text-blue-800">
-                      <strong>메모:</strong> {word.notes}
-                    </div>
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <div className="flex justify-center space-x-4 text-sm text-gray-500">
+                    <span>카테고리: {word.category}</span>
+                    <span>난이도: {word.difficulty === 'easy' ? '쉬움' : word.difficulty === 'medium' ? '보통' : '어려움'}</span>
                   </div>
-                )}
+                </div>
 
                 <div className="mt-8">
                   <div className="text-sm text-gray-400 mb-2">다시 보려면 카드를 클릭하세요</div>
@@ -214,6 +251,43 @@ export default function FlashcardDisplay({ word, showAnswer, isFlipping, onFlip,
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-3xl animate-pulse"></div>
           )}
         </div>
+
+        {/* 네비게이션 버튼 */}
+        {onNext && onPrev && (
+          <div className="flex justify-center items-center gap-4 mt-6">
+            <button
+              onClick={onPrev}
+              disabled={currentIndex === 0}
+              className="group relative px-6 py-3 bg-white/10 backdrop-blur-sm rounded-xl text-white font-semibold transition-all duration-300 hover:bg-white/20 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
+            >
+              <span className="relative z-10 flex items-center">
+                <svg className="w-4 h-4 mr-2 transition-transform group-hover:-translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                이전
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            </button>
+
+            <div className="text-white text-sm bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+              {currentIndex !== undefined && totalCount !== undefined ? `${currentIndex + 1} / ${totalCount}` : ''}
+            </div>
+
+            <button
+              onClick={onNext}
+              disabled={currentIndex !== undefined && totalCount !== undefined && currentIndex >= totalCount - 1}
+              className="group relative px-6 py-3 bg-white/10 backdrop-blur-sm rounded-xl text-white font-semibold transition-all duration-300 hover:bg-white/20 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
+            >
+              <span className="relative z-10 flex items-center">
+                다음
+                <svg className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            </button>
+          </div>
+        )}
 
         {/* 그림자 효과 */}
         <div className={`absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-4/5 h-4 bg-black/10 rounded-full blur-xl transition-all duration-500 ${
