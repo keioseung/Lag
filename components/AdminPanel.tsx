@@ -335,9 +335,44 @@ export default function AdminPanel({ onBackToLearning, onAddWord, words }: Admin
             
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  📝 일괄 입력 (파이프 | 로 구분)
-                </label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    📝 일괄 입력 (파이프 | 로 구분)
+                  </label>
+                  <button
+                    onClick={() => {
+                      const prompt = `다음 형식으로 한국어, 영어, 일본어, 중국어 단어를 20개 만들어줘:
+
+한국어|English|日本語|中文|카테고리|난이도
+
+예시:
+안녕하세요|Hello|こんにちは|你好|인사말|easy
+감사합니다|Thank you|ありがとうございます|谢谢|인사말|easy
+
+카테고리는 다음 중에서 선택해주세요: 인사말, 숫자, 색깔, 음식, 가족, 동물, 기본, 비즈니스, 여행, 취미
+난이도는 easy, medium, hard 중에서 선택해주세요.
+
+실용적이고 자주 사용되는 단어들로 구성해주세요.`
+                      
+                      navigator.clipboard.writeText(prompt).then(() => {
+                        alert('ChatGPT 요청 프롬프트가 클립보드에 복사되었습니다!')
+                      }).catch(() => {
+                        // 클립보드 API가 지원되지 않는 경우
+                        const textArea = document.createElement('textarea')
+                        textArea.value = prompt
+                        document.body.appendChild(textArea)
+                        textArea.select()
+                        document.execCommand('copy')
+                        document.body.removeChild(textArea)
+                        alert('ChatGPT 요청 프롬프트가 클립보드에 복사되었습니다!')
+                      })
+                    }}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm flex items-center space-x-2"
+                  >
+                    <span>📋</span>
+                    <span>ChatGPT 요청문 복사</span>
+                  </button>
+                </div>
                 <textarea
                   value={bulkInput}
                   onChange={(e) => setBulkInput(e.target.value)}
