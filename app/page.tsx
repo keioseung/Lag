@@ -207,176 +207,10 @@ export default function Home() {
       prev === 0 ? filteredWords.length - 1 : prev - 1
     )
   }
-            },
-            {
-              id: 2,
-              original: '谢谢',
-              pronunciation: 'xiè xie',
-              meaning: '감사합니다',
-              category: '인사말',
-              priority: 1,
-              mastery_level: 1.5,
-              times_studied: 3,
-              correct_attempts: 2,
-              total_attempts: 3,
-              is_active: true,
-              review_count: 1,
-              last_reviewed: '2024-01-14',
-              added_date: '2024-01-01',
-              created_at: '2024-01-01T00:00:00Z',
-              updated_at: '2024-01-14T00:00:00Z',
-              difficulty_level: 1,
-              tags: ['기초', '인사'],
-              notes: '감사 표현',
-              total_study_time: 180,
-              average_accuracy: 0.67,
-              last_study_date: '2024-01-14',
-              is_favorite: true,
-              study_date: '2024-01-14'
-            }
-          ])
-        }
-      } else {
-        setWords(response.data || [])
-      }
-    } catch (error) {
-      console.error('단어 로드 오류:', error)
-      // 에러 발생 시 샘플 데이터 사용
-      setWords([
-        {
-          id: 1,
-          original: '你好',
-          pronunciation: 'nǐ hǎo',
-          meaning: '안녕하세요',
-          category: '인사말',
-          priority: 1,
-          mastery_level: 2.0,
-          times_studied: 5,
-          correct_attempts: 4,
-          total_attempts: 5,
-          is_active: true,
-          review_count: 2,
-          last_reviewed: '2024-01-15',
-          added_date: '2024-01-01',
-          created_at: '2024-01-01T00:00:00Z',
-          updated_at: '2024-01-15T00:00:00Z',
-          difficulty_level: 1,
-          tags: ['기초', '인사'],
-          notes: '가장 기본적인 인사말',
-          total_study_time: 300,
-          average_accuracy: 0.8,
-          last_study_date: '2024-01-15',
-          is_favorite: false,
-          study_date: '2024-01-15'
-        }
-      ])
-    } finally {
-      setLoading(false)
-    }
-  }
 
-  const loadStudyStats = async () => {
-    try {
-      const response = await apiClient.getStudyStats()
-      
-      if (response.error) {
-        console.error('백엔드 API 오류:', response.error)
-        if (supabase) {
-          const { data, error } = await supabase
-            .from('study_stats')
-            .select('*')
-            .single()
-          
-          if (error && error.code !== 'PGRST116') throw error
-          setStudyStats(data || {
-            id: 1,
-            daily_streak: 0,
-            total_answered: 0,
-            correct_answers: 0,
-            total_study_time: 0,
-            last_study_date: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-        }
-      } else {
-        setStudyStats(response.data)
-      }
-    } catch (error) {
-      console.error('학습 통계 로드 오류:', error)
-      setStudyStats({
-        id: 1,
-        daily_streak: 0,
-        total_answered: 0,
-        correct_answers: 0,
-        total_study_time: 0,
-        last_study_date: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-    }
-  }
-
-  const flipCard = () => {
-    if (isFlipping || filteredWords.length === 0) return
-    setIsFlipping(true)
-    setShowAnswer(!showAnswer)
-    setTimeout(() => setIsFlipping(false), 300)
-  }
-
-  const nextCard = () => {
-    if (isFlipping || filteredWords.length === 0) return
-    setShowAnswer(false)
-    setCurrentWordIndex((prev) => 
-      prev === filteredWords.length - 1 ? 0 : prev + 1
-    )
-  }
-
-  const prevCard = () => {
-    if (isFlipping || filteredWords.length === 0) return
-    setShowAnswer(false)
-    setCurrentWordIndex((prev) => 
-      prev === 0 ? filteredWords.length - 1 : prev - 1
-    )
-  }
-
-  const toggleAutoPlay = () => {
-    setIsAutoPlay(!isAutoPlay)
-  }
-
-  const toggleFavorite = async (wordId: number) => {
-    try {
-      const word = words.find(w => w.id === wordId)
-      if (!word) return
-
-      const updatedWord = { ...word, is_favorite: !word.is_favorite }
-      
-      // 백엔드 API를 통해 업데이트
-      const response = await apiClient.updateWord(wordId, updatedWord)
-      
-      if (response.error) {
-        console.error('백엔드 API 오류:', response.error)
-        // 백엔드 API 실패 시 Supabase 직접 사용
-        if (supabase) {
-          const { error } = await supabase
-            .from('words')
-            .update({ is_favorite: updatedWord.is_favorite })
-            .eq('id', wordId)
-          
-          if (error) throw error
-        }
-      }
-      
-      setWords(prev => prev.map(w => 
-        w.id === wordId ? { ...w, is_favorite: !w.is_favorite } : w
-      ))
-    } catch (error) {
-      console.error('즐겨찾기 토글 오류:', error)
-    }
-  }
-
+  // 관리자 로그인
   const handleAdminLogin = () => {
-    if (adminPassword === '123321') {
+    if (adminPassword === 'admin123') { // 간단한 비밀번호
       setIsAdminMode(true)
       setShowAdminLogin(false)
       setAdminPassword('')
@@ -384,6 +218,35 @@ export default function Home() {
     } else {
       setAdminLoginError('비밀번호가 올바르지 않습니다.')
     }
+  }
+
+  // 관리자 모드 종료
+  const handleAdminLogout = () => {
+    setIsAdminMode(false)
+    loadWordsFromLocalStorage() // 새로운 데이터가 있다면 다시 로드
+  }
+
+  // 단어 추가 (관리자 패널에서 호출)
+  const addWord = (newWord: Omit<MultiLanguageWord, 'id' | 'createdDate'>) => {
+    const word: MultiLanguageWord = {
+      ...newWord,
+      id: Date.now().toString(),
+      createdDate: new Date().toISOString().split('T')[0]
+    }
+    
+    const updatedWords = [word, ...words]
+    setWords(updatedWords)
+    localStorage.setItem('multiLanguageWords', JSON.stringify(updatedWords))
+  }
+
+  const toggleAutoPlay = () => {
+    setIsAutoPlay(!isAutoPlay)
+  }
+
+  const currentWord = filteredWords[currentWordIndex] || null
+
+  if (isAdminMode) {
+    return <AdminPanel onBackToLearning={handleAdminLogout} onAddWord={addWord} words={words} />
   }
 
   const handleBackToLearning = () => {
@@ -514,7 +377,11 @@ export default function Home() {
                 showAnswer={showAnswer}
                 isFlipping={isFlipping}
                 onFlip={flipCard}
+                onNext={nextCard}
+                onPrev={prevCard}
                 onToggleFavorite={toggleFavorite}
+                currentIndex={currentWordIndex}
+                totalCount={filteredWords.length}
               />
             )}
 
